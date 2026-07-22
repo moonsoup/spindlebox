@@ -41,6 +41,16 @@
         {"name": "cobra", "url": "https://github.com/spf13/cobra", "commit": "e94f6d0dd9a5e5738dca6bce03c4b1207ffbc0ec", "lang": "go", "expect_validate": "any"},
         {"name": "bats-core", "url": "https://github.com/bats-core/bats-core", "commit": "5da66876b8b619235aee1eb3e54954eaca88059b", "lang": "bash", "expect_validate": "any"}
       ]
+    },
+    "2": {
+      "threshold": 90,
+      "weights_profile": "default",
+      "targets": [
+        {"name": "click", "url": "https://github.com/pallets/click", "commit": "874ca2bc1c30d93a4ac6e36a15ed685eafe89097", "lang": "python", "expect_validate": "any", "probes": true},
+        {"name": "express", "url": "https://github.com/expressjs/express", "commit": "04bc62787be974874bc1467b23606c36bc9779ba", "lang": "javascript", "expect_validate": "any", "probes": true},
+        {"name": "serde_json", "url": "https://github.com/serde-rs/json", "commit": "0ae247ca63be75e6c7e6e0e9cd8916e618cf8f24", "lang": "rust", "expect_validate": "any", "probes": true},
+        {"name": "flask", "url": "https://github.com/pallets/flask", "commit": "c12a5d874c5a014495eb2db8a73f40037bc813ac", "lang": "python", "expect_validate": "any", "probes": true}
+      ]
     }
   }
 }

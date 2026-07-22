@@ -178,6 +178,13 @@ def run_target(target: dict, corpus_dir: Path, app_root: Path, scratch: Path) ->
                             "duration_ms": 0, "exit_code": None,
                             "detail": "cargo not installed"})
 
+    if target.get("probes"):
+        for probe, args in (("gaps_probe", ["gaps", "--json"]),
+                            ("workflows_probe", ["workflows", "--json"])):
+            rec = run_stage(probe, spindlebox_cmd(*args), repo_dir, lang,
+                            repro_cmd=f"cd {repo_dir} && python3 -m spindlebox {args[0]} --json")
+            records.append(rec)
+
     if target.get("dispatch"):
         rec = run_stage(
             "dispatch", spindlebox_cmd("call", "pure.add", "--ctx", '{"a": 2, "b": 40}'),
