@@ -6,36 +6,36 @@ import hashlib
 from datetime import datetime
 from pathlib import Path
 
-import findexer
-from findexer.addresses import assign_ordinals, make_address, module_parts
-from findexer.ctxnorm import apply_ctx_normalization
-from findexer.depmap import external_packages, find_env_vars, resolve_calls
-from findexer.extract.base import (
+import spindlebox
+from spindlebox.addresses import assign_ordinals, make_address, module_parts
+from spindlebox.ctxnorm import apply_ctx_normalization
+from spindlebox.depmap import external_packages, find_env_vars, resolve_calls
+from spindlebox.extract.base import (
     STATE_TO_TRAIT,
     RawDecl,
     discover_files,
     normalize_langs,
 )
-from findexer.schema import CtxAdapter, Deps, Group, Item, Param, ScaIndex, Signature
-from findexer.sigclass import build_signature_classes, partition_op_arrays, sig_class_id
-from findexer.typenorm import normalize
+from spindlebox.schema import CtxAdapter, Deps, Group, Item, Param, ScaIndex, Signature
+from spindlebox.sigclass import build_signature_classes, partition_op_arrays, sig_class_id
+from spindlebox.typenorm import normalize
 
 
 def _extract_file(lang: str, rel: str, source: str) -> list[RawDecl]:
     if lang == "python":
-        from findexer.extract.py_lang import extract_python_file
+        from spindlebox.extract.py_lang import extract_python_file
         return extract_python_file(rel, source)
     if lang in ("javascript", "typescript"):
-        from findexer.extract.js_lang import extract_js_file
+        from spindlebox.extract.js_lang import extract_js_file
         return extract_js_file(rel, source, lang)
     if lang == "go":
-        from findexer.extract.go_lang import extract_go_file
+        from spindlebox.extract.go_lang import extract_go_file
         return extract_go_file(rel, source)
     if lang == "rust":
-        from findexer.extract.rust_lang import extract_rust_file
+        from spindlebox.extract.rust_lang import extract_rust_file
         return extract_rust_file(rel, source)
     if lang == "bash":
-        from findexer.extract.bash_lang import extract_bash_file
+        from spindlebox.extract.bash_lang import extract_bash_file
         return extract_bash_file(rel, source)
     raise ValueError(f"no extractor for language '{lang}'")
 
@@ -153,7 +153,7 @@ def build_index(
         project_name=project_name,
         root=str(root),
         generated_at=datetime.now().isoformat(timespec="seconds"),
-        findexer_version=findexer.__version__,
+        spindlebox_version=spindlebox.__version__,
         items=sorted(items, key=lambda i: i.ordinal),
         groups=groups,
         signature_classes=signature_classes,

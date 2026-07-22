@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from findexer.extract import build_index
+from spindlebox.extract import build_index
 
 FIXTURE = Path(__file__).parent / "fixtures" / "miniproj_rust"
 

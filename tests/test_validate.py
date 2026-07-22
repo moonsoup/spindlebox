@@ -2,9 +2,9 @@ from pathlib import Path
 
 from test_schema import make_index
 
-from findexer.extract import build_index
-from findexer.schema import Pipeline
-from findexer.validate import validate_index
+from spindlebox.extract import build_index
+from spindlebox.schema import Pipeline
+from spindlebox.validate import validate_index
 
 FIXTURE = Path(__file__).parent / "fixtures" / "miniproj_py"
 

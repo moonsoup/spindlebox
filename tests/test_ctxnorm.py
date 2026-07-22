@@ -1,5 +1,5 @@
-from findexer.ctxnorm import apply_ctx_normalization
-from findexer.schema import CtxAdapter, Deps, Item, Param, Signature
+from spindlebox.ctxnorm import apply_ctx_normalization
+from spindlebox.schema import CtxAdapter, Deps, Item, Param, Signature
 
 
 def make_item(ordinal, name, group, params, ret):

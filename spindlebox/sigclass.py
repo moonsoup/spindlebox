@@ -7,7 +7,7 @@ languages land in the same class.
 
 from __future__ import annotations
 
-from findexer.schema import Group, Item, Signature
+from spindlebox.schema import Group, Item, Signature
 
 
 def sig_class_id(sig: Signature) -> str:

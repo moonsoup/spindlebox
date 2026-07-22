@@ -1,6 +1,6 @@
 import pytest
 
-from findexer.schema import (
+from spindlebox.schema import (
     CtxAdapter,
     Deps,
     Group,
@@ -49,7 +49,7 @@ def make_index():
         project_name="demo",
         root="/tmp/demo",
         generated_at="2026-07-21T00:00:00",
-        findexer_version="0.1.0",
+        spindlebox_version="0.1.0",
         items=[item],
         groups=[
             Group(
@@ -100,3 +100,13 @@ def test_bad_enum_rejected():
     d["items"][0]["state_capture"] = "haunted"
     with pytest.raises(SchemaError):
         ScaIndex.from_dict(d)
+
+
+def test_legacy_field_names_load():
+    """Pre-rebrand indexes (sca_version / findexer_version) still load."""
+    d = make_index().to_dict()
+    d["sca_version"] = d.pop("spi_version")
+    d["project"]["findexer_version"] = d["project"].pop("spindlebox_version")
+    loaded = ScaIndex.from_dict(d)
+    assert loaded.spi_version == "1.0"
+    assert loaded.spindlebox_version == "0.1.0"

@@ -7,8 +7,8 @@ by design.
 
 from __future__ import annotations
 
-from findexer.extract.base import RawDecl, RawParam
-from findexer.extract.ts_util import parse, preceding_doc, text, walk
+from spindlebox.extract.base import RawDecl, RawParam
+from spindlebox.extract.ts_util import parse, preceding_doc, text, walk
 
 BASH_RETURN = "result<str,i64>"
 

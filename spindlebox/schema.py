@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from findexer import SCA_VERSION, TYPE_VOCABULARY
+from spindlebox import SPI_VERSION, TYPE_VOCABULARY
 
 ITEM_KINDS = {"function", "method", "closure", "lambda", "script_main"}
 PARAM_KINDS = {"positional", "keyword", "variadic", "kwvariadic", "receiver"}
@@ -248,7 +248,7 @@ class ScaIndex:
     project_name: str
     root: str
     generated_at: str
-    findexer_version: str
+    spindlebox_version: str
     items: list[Item]
     groups: list[Group]
     signature_classes: dict[str, dict]
@@ -256,15 +256,15 @@ class ScaIndex:
     ctx_schema: dict[str, str]
     retired_ordinals: list[int]
     type_vocabulary: str = TYPE_VOCABULARY
-    sca_version: str = SCA_VERSION
+    spi_version: str = SPI_VERSION
 
     def to_dict(self) -> dict:
         return {
-            "sca_version": self.sca_version,
+            "spi_version": self.spi_version,
             "project": {
                 "name": self.project_name, "root": self.root,
                 "generated_at": self.generated_at,
-                "findexer_version": self.findexer_version,
+                "spindlebox_version": self.spindlebox_version,
             },
             "type_vocabulary": self.type_vocabulary,
             "items": [i.to_dict() for i in self.items],
@@ -278,12 +278,19 @@ class ScaIndex:
     @classmethod
     def from_dict(cls, d: dict) -> ScaIndex:
         project = _req(d, "project", "index")
+        # accept legacy pre-rebrand field names (sca_version / findexer_version)
+        version = d.get("spi_version", d.get("sca_version"))
+        if version is None:
+            raise SchemaError("missing required field 'spi_version' in index")
+        tool_version = project.get("spindlebox_version", project.get("findexer_version"))
+        if tool_version is None:
+            raise SchemaError("missing required field 'spindlebox_version' in project")
         return cls(
-            sca_version=_req(d, "sca_version", "index"),
+            spi_version=version,
             project_name=_req(project, "name", "project"),
             root=_req(project, "root", "project"),
             generated_at=_req(project, "generated_at", "project"),
-            findexer_version=_req(project, "findexer_version", "project"),
+            spindlebox_version=tool_version,
             type_vocabulary=d.get("type_vocabulary", TYPE_VOCABULARY),
             items=[Item.from_dict(i) for i in _req(d, "items", "index")],
             groups=[Group.from_dict(g) for g in d.get("groups", [])],
@@ -326,3 +333,6 @@ class ScaIndex:
                 if g.path == path:
                     return g
         return None
+
+
+SpiIndex = ScaIndex  # branded alias — SPI (Serialized Process Index)

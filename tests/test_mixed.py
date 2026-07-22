@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from findexer.extract import build_index
-from findexer.validate import validate_index
+from spindlebox.extract import build_index
+from spindlebox.validate import validate_index
 
 FIXTURE = Path(__file__).parent / "fixtures" / "miniproj_mixed"
 

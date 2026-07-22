@@ -12,8 +12,8 @@ Warnings (errors under --strict): 'any'-bearing signatures.
 
 from __future__ import annotations
 
-from findexer.schema import ScaIndex
-from findexer.sigclass import sig_class_id
+from spindlebox.schema import ScaIndex
+from spindlebox.sigclass import sig_class_id
 
 
 def validate_index(index: ScaIndex, strict: bool = False) -> tuple[list[str], list[str]]:

@@ -1,22 +1,43 @@
-"""Central registry of indexed projects (~/.findexer/registry.json)."""
+"""Central registry of indexed projects (~/.spindlebox/registry.json).
+
+Legacy support: reads SPINDLEBOX_HOME first, then FINDEXER_HOME; a pre-rebrand
+~/.findexer/registry.json is migrated to ~/.spindlebox/ on first load.
+"""
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 
 
 def _home() -> Path:
-    return Path(os.environ.get("FINDEXER_HOME", str(Path.home() / ".findexer")))
+    for var in ("SPINDLEBOX_HOME", "FINDEXER_HOME"):
+        if var in os.environ:
+            return Path(os.environ[var])
+    return Path.home() / ".spindlebox"
 
 
 def _registry_path() -> Path:
     return _home() / "registry.json"
 
 
+def _migrate_legacy() -> None:
+    if "SPINDLEBOX_HOME" in os.environ or "FINDEXER_HOME" in os.environ:
+        return  # explicit home override: never pull in the default legacy registry
+    new = _registry_path()
+    if new.exists():
+        return
+    legacy = Path.home() / ".findexer" / "registry.json"
+    if legacy.exists():
+        new.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(legacy, new)
+
+
 def _load() -> dict:
+    _migrate_legacy()
     path = _registry_path()
     if not path.exists():
         return {"projects": {}}

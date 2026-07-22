@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from findexer.extract import build_index
-from findexer.generate import BACKENDS, GenOptions
+from spindlebox.extract import build_index
+from spindlebox.generate import BACKENDS, GenOptions
 
 FIXTURE = Path(__file__).parent / "fixtures" / "miniproj_mixed"
 

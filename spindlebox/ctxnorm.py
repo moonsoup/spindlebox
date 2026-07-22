@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-from findexer.schema import Item
+from spindlebox.schema import Item
 
 _IDENT_BAD = re.compile(r"[^A-Za-z0-9_]")
 

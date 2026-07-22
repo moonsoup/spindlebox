@@ -1,6 +1,6 @@
 import pytest
 
-from findexer.addresses import (
+from spindlebox.addresses import (
     assign_ordinals,
     make_address,
     parse_ranges,

@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "findexer"
-version = "0.1.0"
-description = "Serialized Code Architecture indexer: empirical function index, dependency map, and skeleton generator for any codebase."
+name = "spindlebox"
+version = "0.2.0"
+description = "SPIndlebox: the SPIndleframe architecture indexer - empirical Serialized Process Index (SPI), dependency map, and skeleton generator for any codebase."
 requires-python = ">=3.11"
 dependencies = [
     "tree-sitter==0.26.0",
@@ -21,10 +21,11 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.4"]
 
 [project.scripts]
-findexer = "findexer.cli:main"
+spindlebox = "spindlebox.cli:main"
+findexer = "spindlebox.cli:main"  # legacy alias, kept forever
 
 [tool.setuptools.packages.find]
-include = ["findexer*"]
+include = ["spindlebox*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

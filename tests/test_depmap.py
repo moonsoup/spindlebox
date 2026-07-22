@@ -1,4 +1,4 @@
-from findexer.depmap import external_packages, find_env_vars, resolve_calls
+from spindlebox.depmap import external_packages, find_env_vars, resolve_calls
 
 
 def test_env_vars_python():

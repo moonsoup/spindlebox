@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from findexer.cli import main
+from spindlebox.cli import main
 
 FIXTURE = Path(__file__).parent / "fixtures" / "miniproj_py"
 
 
 @pytest.fixture()
 def proj(tmp_path, monkeypatch):
-    monkeypatch.setenv("FINDEXER_HOME", str(tmp_path / "fhome"))
+    monkeypatch.setenv("SPINDLEBOX_HOME", str(tmp_path / "fhome"))
     root = tmp_path / "miniproj_py"
     shutil.copytree(FIXTURE, root)
     return root
@@ -19,7 +19,7 @@ def proj(tmp_path, monkeypatch):
 
 def test_index_creates_and_registers(proj, capsys):
     assert main(["index", str(proj)]) == 0
-    assert (proj / ".sca" / "index.json").exists()
+    assert (proj / ".spi" / "index.json").exists()
     out = capsys.readouterr().out
     assert "miniproj_py" in out
     assert main(["projects", "list"]) == 0
@@ -101,13 +101,13 @@ def test_pipeline_define_and_check(proj, capsys):
 def test_sticky_ordinals_on_reindex(proj, capsys):
     main(["index", str(proj)])
     capsys.readouterr()
-    idx1 = json.loads((proj / ".sca" / "index.json").read_text())
+    idx1 = json.loads((proj / ".spi" / "index.json").read_text())
     ord_by_addr = {i["address"]: i["ordinal"] for i in idx1["items"]}
     # add a new function at the top of a file — would shift naive ordinals
     app = proj / "app.py"
     app.write_text("def zeroth() -> int:\n    return 0\n\n\n" + app.read_text())
     main(["index", str(proj)])
-    idx2 = json.loads((proj / ".sca" / "index.json").read_text())
+    idx2 = json.loads((proj / ".spi" / "index.json").read_text())
     for item in idx2["items"]:
         if item["address"] in ord_by_addr:
             assert item["ordinal"] == ord_by_addr[item["address"]]
@@ -115,7 +115,7 @@ def test_sticky_ordinals_on_reindex(proj, capsys):
 
 def test_validate_catches_tampering(proj, capsys):
     main(["index", str(proj)])
-    p = proj / ".sca" / "index.json"
+    p = proj / ".spi" / "index.json"
     data = json.loads(p.read_text())
     data["items"][0]["sig_class"] = "sig:bool->bool"
     p.write_text(json.dumps(data))

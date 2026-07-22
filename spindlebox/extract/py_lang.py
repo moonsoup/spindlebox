@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import symtable
 
-from findexer.extract.base import RawDecl, RawParam
+from spindlebox.extract.base import RawDecl, RawParam
 
 _FUNC_NODES = (ast.FunctionDef, ast.AsyncFunctionDef)
 _SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)

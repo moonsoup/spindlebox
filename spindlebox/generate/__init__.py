@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from findexer.generate.base import GeneratedFile, GeneratorBackend, GenOptions
-from findexer.generate.rust_backend import RustBackend
+from spindlebox.generate.base import GeneratedFile, GeneratorBackend, GenOptions
+from spindlebox.generate.rust_backend import RustBackend
 
 BACKENDS: dict[str, type[GeneratorBackend]] = {}
 

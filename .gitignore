@@ -8,3 +8,5 @@ build/
 .ruff_cache/
 .sca/
 !tests/fixtures/**/.sca/
+.spi/
+!tests/fixtures/**/.spi/

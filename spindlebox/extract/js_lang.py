@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 
-from findexer.extract.base import RawDecl, RawParam
-from findexer.extract.ts_util import parse, preceding_doc, text, walk, walk_own
+from spindlebox.extract.base import RawDecl, RawParam
+from spindlebox.extract.ts_util import parse, preceding_doc, text, walk, walk_own
 
 FUNC_TYPES = {
     "function_declaration", "generator_function_declaration", "function_expression",

@@ -1,6 +1,6 @@
-from findexer.schema import Param, Signature
-from findexer.sigclass import sig_class_id
-from findexer.typenorm import normalize
+from spindlebox.schema import Param, Signature
+from spindlebox.sigclass import sig_class_id
+from spindlebox.typenorm import normalize
 
 
 def sig(params, ret):

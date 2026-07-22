@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from findexer.dispatch import DispatchError, call_item
-from findexer.extract import build_index
+from spindlebox.dispatch import DispatchError, call_item
+from spindlebox.extract import build_index
 
 FIXTURE = Path(__file__).parent / "fixtures" / "miniproj_py"
 

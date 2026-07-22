@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 
-from findexer.extract.base import RawDecl, RawParam
-from findexer.extract.ts_util import parse, preceding_doc, text, walk, walk_own
+from spindlebox.extract.base import RawDecl, RawParam
+from spindlebox.extract.ts_util import parse, preceding_doc, text, walk, walk_own
 
 _BOUNDARY = {"function_item", "closure_expression"}
 _CALL_RE = re.compile(r"^[A-Za-z_][\w:]*(\.[\w]+)*$")

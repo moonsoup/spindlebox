@@ -1,4 +1,4 @@
-"""findexer CLI — single entry point for all SCA index operations."""
+"""SPIndlebox CLI — single entry point for all SPI (Serialized Process Index) operations."""
 
 from __future__ import annotations
 
@@ -8,13 +8,13 @@ import json
 import sys
 from pathlib import Path
 
-import findexer
-from findexer import registry
-from findexer.addresses import parse_selector
-from findexer.dispatch import DispatchError, call_item, resolve_item
-from findexer.extract import build_index
-from findexer.schema import Pipeline, ScaIndex, SchemaError
-from findexer.validate import validate_index
+import spindlebox
+from spindlebox import registry
+from spindlebox.addresses import parse_selector
+from spindlebox.dispatch import DispatchError, call_item, resolve_item
+from spindlebox.extract import build_index
+from spindlebox.schema import Pipeline, ScaIndex, SchemaError
+from spindlebox.validate import validate_index
 
 
 class CliError(Exception):
@@ -24,13 +24,23 @@ class CliError(Exception):
 # ------------------------------------------------------------ index loading
 
 def _index_path_for_root(root: Path) -> Path:
-    return root / ".sca" / "index.json"
+    """Where new indexes are written: .spi/index.json (SPI = Serialized Process Index)."""
+    return root / ".spi" / "index.json"
+
+
+def _existing_index_path(root: Path) -> Path | None:
+    """Find a readable index: .spi first, then legacy .sca from pre-rebrand builds."""
+    for rel in (".spi/index.json", ".sca/index.json"):
+        candidate = root / rel
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def _find_root_upwards(start: Path) -> Path | None:
     cur = start.resolve()
     for candidate in [cur, *cur.parents]:
-        if _index_path_for_root(candidate).exists():
+        if _existing_index_path(candidate) is not None:
             return candidate
     return None
 
@@ -40,16 +50,16 @@ def _load_project(args) -> tuple[ScaIndex, Path]:
     if project:
         entry = registry.list_projects().get(project)
         if entry is None:
-            raise CliError(f"project '{project}' is not registered (findexer projects list)")
+            raise CliError(f"project '{project}' is not registered (spindlebox projects list)")
         return ScaIndex.load(entry["index"]), Path(entry["root"])
     path = Path(getattr(args, "path", None) or ".")
     root = _find_root_upwards(path)
     if root is None:
         raise CliError(
-            f"no .sca/index.json found at or above {path.resolve()}; "
-            "run 'findexer index <path>' or pass --project"
+            f"no .spi/index.json (or legacy .sca/) found at or above {path.resolve()}; "
+            "run 'spindlebox index <path>' or pass --project"
         )
-    return ScaIndex.load(_index_path_for_root(root)), root
+    return ScaIndex.load(_existing_index_path(root)), root
 
 
 # ------------------------------------------------------------ commands
@@ -60,9 +70,10 @@ def cmd_index(args) -> int:
         raise CliError(f"not a directory: {root}")
     index_path = _index_path_for_root(root)
     old = None
-    if index_path.exists():
+    old_path = _existing_index_path(root)  # .spi, or legacy .sca (ordinals survive rebrand)
+    if old_path is not None:
         try:
-            old = ScaIndex.load(index_path)
+            old = ScaIndex.load(old_path)
         except SchemaError as e:
             print(f"warning: existing index unreadable, rebuilding fresh ({e})", file=sys.stderr)
     name = args.name or root.name
@@ -303,9 +314,9 @@ def cmd_pipeline(args) -> int:
 
 def cmd_projects(args) -> int:
     if args.proj_cmd == "add":
-        index_path = _index_path_for_root(Path(args.path).resolve())
-        if not index_path.exists():
-            raise CliError(f"no index at {index_path}; run findexer index first")
+        index_path = _existing_index_path(Path(args.path).resolve())
+        if index_path is None:
+            raise CliError(f"no index under {args.path}; run spindlebox index first")
         registry.register(args.name, str(Path(args.path).resolve()), str(index_path))
         print(f"registered '{args.name}'")
         return 0
@@ -323,7 +334,7 @@ def cmd_projects(args) -> int:
 
 
 def cmd_generate(args) -> int:
-    from findexer.generate import BACKENDS, GenOptions
+    from spindlebox.generate import BACKENDS, GenOptions
     backend_cls = BACKENDS.get(args.lang)
     if backend_cls is None:
         raise CliError(f"no generator backend for '{args.lang}' (have: {sorted(BACKENDS)})")
@@ -342,7 +353,7 @@ def cmd_install_skill(args) -> int:
     src = Path(__file__).resolve().parent.parent / "skill" / "SKILL.md"
     if not src.exists():
         raise CliError(f"skill source not found at {src}")
-    dest = Path.home() / ".claude" / "skills" / "findexer" / "SKILL.md"
+    dest = Path.home() / ".claude" / "skills" / "spindlebox" / "SKILL.md"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(src.read_text())
     print(f"installed skill → {dest}")
@@ -357,11 +368,11 @@ def _add_project_arg(p):
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="findexer",
+        prog="spindlebox",
         description="Serialized Code Architecture indexer: build, query, validate, "
         "invoke, and generate from a function index.",
     )
-    parser.add_argument("--version", action="version", version=findexer.__version__)
+    parser.add_argument("--version", action="version", version=spindlebox.__version__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("index", help="build/refresh the SCA index for a repo")
@@ -444,7 +455,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("name")
     p.set_defaults(func=cmd_projects)
 
-    p = sub.add_parser("install-skill", help="install the findexer skill to ~/.claude/skills")
+    p = sub.add_parser("install-skill", help="install the spindlebox skill to ~/.claude/skills")
     p.set_defaults(func=cmd_install_skill)
 
     return parser
@@ -455,7 +466,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.func(args)
     except (CliError, DispatchError, SchemaError, ValueError) as e:
-        print(f"findexer: {e}", file=sys.stderr)
+        print(f"spindlebox: {e}", file=sys.stderr)
         return 1
 
 

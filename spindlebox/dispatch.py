@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from findexer.schema import Item, ScaIndex
+from spindlebox.schema import Item, ScaIndex
 
 
 class DispatchError(Exception):
@@ -38,7 +38,7 @@ def call_item(index: ScaIndex, root: str | Path, selector: str, ctx: dict[str, A
             f"'{item.address}' is a {item.kind}; only module-level functions are callable"
         )
     path = Path(root) / item.file
-    module_name = "findexer_target_" + item.file.replace("/", "_").removesuffix(".py")
+    module_name = "spindlebox_target_" + item.file.replace("/", "_").removesuffix(".py")
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise DispatchError(f"cannot load module at {path}")

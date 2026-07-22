@@ -1,6 +1,6 @@
 import pytest
 
-from findexer.typenorm import go_return, normalize
+from spindlebox.typenorm import go_return, normalize
 
 PY_CASES = [
     ("str", "str"),
