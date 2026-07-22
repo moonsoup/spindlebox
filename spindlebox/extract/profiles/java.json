@@ -1,0 +1,104 @@
+{
+  "language": "java",
+  "extensions": [".java"],
+  "grammar": {"module": "tree_sitter_java", "attr": "language", "name": "java"},
+  "walker": true,
+  "mode": "nested",
+  "boundaries": ["method_declaration", "constructor_declaration", "lambda_expression"],
+  "containers": {
+    "class_declaration": {"role": "class", "name_field": "name"},
+    "interface_declaration": {"role": "class", "name_field": "name"},
+    "enum_declaration": {"role": "class", "name_field": "name"},
+    "record_declaration": {"role": "class", "name_field": "name"},
+    "annotation_type_declaration": {"role": "class", "name_field": "name"}
+  },
+  "imports": [{"node": "import_declaration", "child_type": "scoped_identifier"}],
+  "env_patterns": ["System\\.getenv\\(\\s*\"([A-Za-z_][A-Za-z0-9_]*)\""],
+  "external_imports": {"stdlib_roots": ["java", "javax", "jdk", "sun"], "drop_last_segment": true},
+  "calls": {
+    "node": "method_invocation",
+    "compose": {"object": "object", "name": "name"},
+    "pattern": "^[A-Za-z_$][\\w$]*(\\.[\\w$]+)*$",
+    "boundaries": ["lambda_expression"]
+  },
+  "doc": {"types": ["line_comment", "block_comment"], "clean": "javadoc"},
+  "declare": {
+    "param_fields": ["parameters"],
+    "nodes": {
+      "local_variable_declaration": {"child_type": "variable_declarator", "name_field": "name"},
+      "enhanced_for_statement": {"field": "name"}
+    }
+  },
+  "writes": {
+    "assign": ["assignment_expression"],
+    "assign_field": "left",
+    "assign_idents": "single",
+    "update": ["update_expression"]
+  },
+  "instance": {
+    "assign": ["assignment_expression"],
+    "update": ["update_expression"],
+    "member_prefix": "this.",
+    "this_node": "this"
+  },
+  "params": {
+    "field": "parameters",
+    "nodes": {
+      "formal_parameter": {"type_field": "type", "name_field": "name", "fallback": "arg{i}"},
+      "spread_parameter": {
+        "kind": "variadic",
+        "type_from": "first_named_child",
+        "name_from": {"child_type": "variable_declarator", "field": "name"},
+        "fallback": "args"
+      },
+      "inferred_parameters": {"children_are_names": true}
+    }
+  },
+  "declarations": {
+    "method_declaration": {
+      "kind": "auto",
+      "name": {"field": "name"},
+      "returns": {"field": "type"},
+      "capture": "instance_this"
+    },
+    "constructor_declaration": {
+      "kind": "method",
+      "name": {"field": "name"},
+      "capture": "instance_this"
+    },
+    "lambda_expression": {
+      "kind": "lambda",
+      "name": "<lambda>",
+      "capture": "closure",
+      "floor": "pure",
+      "recurse_scope": "anon"
+    }
+  },
+  "types": {
+    "mode": "table",
+    "unannotated": "unit",
+    "generic": ["<", ">"],
+    "array_suffix": "[]",
+    "simple": {
+      "String": "str", "char": "str", "Character": "str", "CharSequence": "str",
+      "StringBuilder": "str", "StringBuffer": "str",
+      "int": "i64", "long": "i64", "short": "i64", "byte": "i64",
+      "Integer": "i64", "Long": "i64", "Short": "i64", "Byte": "i64", "BigInteger": "i64",
+      "float": "f64", "double": "f64", "Float": "f64", "Double": "f64", "BigDecimal": "f64",
+      "boolean": "bool", "Boolean": "bool",
+      "void": "unit", "Void": "unit",
+      "Object": "any",
+      "byte[]": "bytes", "ByteBuffer": "bytes",
+      "Runnable": "fn", "Thread": "obj:Thread",
+      "Exception": "error", "Throwable": "error", "Error": "error",
+      "RuntimeException": "error", "IOException": "error"
+    },
+    "list_bases": ["List", "ArrayList", "LinkedList", "Collection", "Vector", "Queue", "Deque", "ArrayDeque"],
+    "map_bases": ["Map", "HashMap", "TreeMap", "LinkedHashMap", "Hashtable", "ConcurrentMap", "ConcurrentHashMap", "SortedMap", "NavigableMap"],
+    "set_bases": ["Set", "HashSet", "TreeSet", "LinkedHashSet", "EnumSet", "SortedSet", "NavigableSet"],
+    "optional_bases": ["Optional", "OptionalInt", "OptionalLong", "OptionalDouble"],
+    "iter_bases": ["Iterator", "Iterable", "Stream", "IntStream", "LongStream", "DoubleStream", "Enumeration"],
+    "fn_bases": ["Function", "BiFunction", "Supplier", "Consumer", "BiConsumer", "Predicate", "BiPredicate", "UnaryOperator", "BinaryOperator", "Callable"],
+    "unwrap_bases": ["CompletableFuture", "Future", "AtomicReference"]
+  }
+}

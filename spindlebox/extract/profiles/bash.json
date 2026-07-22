@@ -1,0 +1,18 @@
+{
+  "language": "bash",
+  "extensions": [".sh", ".bash"],
+  "grammar": {"module": "tree_sitter_bash", "attr": "language", "name": "bash"},
+  "walker": true,
+  "mode": "flat",
+  "declarations": {
+    "function_definition": {"kind": "function", "name": {"field": "name"}}
+  },
+  "fixed_signature": {
+    "params": [{"name": "args", "kind": "variadic"}],
+    "returns_norm": "result<str,i64>"
+  },
+  "calls": {"node": "command", "field": "name", "known_only": true},
+  "imports_hook": "bash_source_imports",
+  "doc": {"types": ["comment"]},
+  "types": {"mode": "fixed", "value": "str"}
+}

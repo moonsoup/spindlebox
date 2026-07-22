@@ -134,3 +134,24 @@ def test_multiline_type_collapses_to_single_line():
     result = normalize(raw, "rust")
     assert "\n" not in result
     assert "obj:" not in result or all(" " not in seg for seg in result.split(","))
+
+
+def test_java_table_driven():
+    """Java normalizes through its profile's type table — no _java() function."""
+    assert normalize("String", "java") == "str"
+    assert normalize("int", "java") == "i64"
+    assert normalize("double", "java") == "f64"
+    assert normalize("boolean", "java") == "bool"
+    assert normalize("void", "java") == "unit"
+    assert normalize("byte[]", "java") == "bytes"
+    assert normalize("String[]", "java") == "list<str>"
+    assert normalize("List<String>", "java") == "list<str>"
+    assert normalize("java.util.List<String>", "java") == "list<str>"
+    assert normalize("Map<String, Integer>", "java") == "map<str,i64>"
+    assert normalize("Optional<Map<String, Integer>>", "java") == "option<map<str,i64>>"
+    assert normalize("Function<String, Integer>", "java") == "fn"
+    assert normalize("Stream<String>", "java") == "iter<str>"
+    assert normalize("CompletableFuture<String>", "java") == "str"
+    assert normalize("Widget", "java") == "obj:Widget"
+    assert normalize(None, "java") == "unit"
+    assert normalize("list[str]", "python") == normalize("List<String>", "java")

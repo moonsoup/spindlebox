@@ -1,7 +1,7 @@
 # SPIndlebox
 
 **The SPIndleframe indexer.** SPIndlebox empirically decomposes any codebase — Python,
-JavaScript/TypeScript, Go, Rust, Bash — into an **SPI (Serialized Process Index)**: a
+JavaScript/TypeScript, Go, Rust, Bash, Java — into an **SPI (Serialized Process Index)**: a
 nested, addressable, data-driven index of every function, so that:
 
 1. **Nothing gets rebuilt that already exists** — `spindlebox search <concept> --all-projects`
@@ -65,6 +65,18 @@ spindlebox generate --lang rust --out /tmp/port
   `.spi/`. Sticky ordinals survive the migration.
 - Registry lives at `~/.spindlebox/registry.json` (`SPINDLEBOX_HOME` to override); a
   pre-rebrand `~/.findexer/registry.json` is migrated automatically.
+
+## Adding a language
+
+Input languages are defined by **declarative profiles** (`spindlebox/extract/profiles/*.json`):
+file extensions, tree-sitter grammar wheel, node-role tables, capture-analysis rules, a
+core-1 type table, and env-var/import patterns. A generic walker (`extract/profile_lang.py`)
+consumes the profile; the handful of genuinely language-specific behaviors live in a shared,
+named hook library that profiles reference by name. Adding a language = one JSON profile +
+one pinned grammar wheel + corpus entries — no new extractor module. Java is implemented
+this way end to end; Go and Bash run through the same walker, differential-tested against
+their legacy extractors (which remain as the reference implementations). Python deliberately
+stays on stdlib `ast`/`symtable` (richer scope analysis than tree-sitter).
 
 ## Notes & limits
 

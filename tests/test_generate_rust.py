@@ -167,3 +167,21 @@ def test_ctx_struct_fields_unique(files):
     m = re.search(r"pub struct Ctx \{(.*?)\n\}", lib, re.S)
     fields = re.findall(r"pub (\S+):", m.group(1))
     assert len(fields) == len(set(fields)), "duplicate Ctx field"
+
+
+@pytest.mark.skipif(shutil.which("cargo") is None, reason="cargo not installed")
+def test_cargo_check_java_fixture(tmp_path):
+    """Rust generated from the profile-driven Java index must compile."""
+    idx = build_index(
+        Path(__file__).parent / "fixtures" / "miniproj_java",
+        project_name="miniproj_java", langs=["java"],
+    )
+    backend = BACKENDS["rust"]()
+    for f in backend.generate(idx, GenOptions()):
+        out = tmp_path / f.relpath
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(f.content)
+    proc = subprocess.run(
+        ["cargo", "check", "--quiet"], cwd=tmp_path, capture_output=True, text=True
+    )
+    assert proc.returncode == 0, proc.stderr

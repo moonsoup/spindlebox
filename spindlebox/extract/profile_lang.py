@@ -1,0 +1,430 @@
+"""Generic profile-driven extractor: one tree-sitter walk for any language.
+
+The walk is parameterized entirely by a ``LanguageProfile`` (JSON data).
+The few behaviors that resist declarative description live in the HOOKS
+library below and are referenced from profiles *by name* — adding a new
+language should not normally require adding a hook.
+"""
+
+from __future__ import annotations
+
+import re
+
+from spindlebox.extract.base import RawDecl, RawParam
+from spindlebox.extract.profile_registry import LanguageProfile
+from spindlebox.extract.ts_util import parse, preceding_doc, text, walk, walk_own
+
+HOOKS: dict = {}
+
+
+def hook(name: str):
+    def register(fn):
+        HOOKS[name] = fn
+        return fn
+    return register
+
+
+# ------------------------------------------------------------------ helpers
+
+def _clean_doc(doc: str | None, style: str | None) -> str | None:
+    if doc and style == "javadoc":
+        doc = doc.lstrip("*").strip() or None
+    return doc
+
+
+def _field_or_self(node, field_name: str | None):
+    if field_name is None:
+        return node
+    return node.child_by_field_name(field_name) or node
+
+
+class ProfileWalker:
+    def __init__(self, profile: LanguageProfile, rel_path: str, source: str):
+        self.p = profile
+        self.rel_path = rel_path
+        self.source = source
+        self.boundaries = set(profile.boundaries)
+        self.decls: list[RawDecl] = []
+        grammar = profile.grammar or {}
+        self.tree = parse(grammar.get("name", profile.language), source)
+        self.root = self.tree.root_node
+        self.imports = self._collect_imports()
+        pattern = profile.calls.get("pattern")
+        self.call_re = re.compile(pattern) if pattern else None
+        self.known_fn_names: set[str] = set()
+
+    # -------------------------------------------------------------- imports
+
+    def _collect_imports(self) -> list[str]:
+        if self.p.imports_hook:
+            return HOOKS[self.p.imports_hook](self)
+        out: list[str] = []
+        rules = {r["node"]: r for r in self.p.imports}
+        for n in walk(self.root):
+            rule = rules.get(n.type)
+            if rule is None:
+                continue
+            if "child_type" in rule:
+                target = next((c for c in n.named_children if c.type == rule["child_type"]), None)
+            else:
+                target = _field_or_self(n, rule.get("field"))
+            if target is not None:
+                val = text(target).strip(rule.get("strip", ""))
+                if val:
+                    out.append(val)
+        return out
+
+    # --------------------------------------------------------------- params
+
+    def _params(self, node) -> list[RawParam]:
+        spec = self.p.params
+        plist = node.child_by_field_name(spec.get("field", "parameters"))
+        if plist is None:
+            return []
+        if plist.type == "identifier":  # single bare inferred param (Java lambda `t -> ...`)
+            return [RawParam(name=text(plist))]
+        out: list[RawParam] = []
+        rules = spec.get("nodes", {})
+        for pd in plist.named_children:
+            rule = rules.get(pd.type)
+            if rule is None:
+                continue
+            if "hook" in rule:
+                out.extend(HOOKS[rule["hook"]](self, pd, len(out)))
+                continue
+            if rule.get("children_are_names"):  # e.g. inferred_parameters
+                out.extend(RawParam(name=text(c))
+                           for c in pd.named_children if c.type == "identifier")
+                continue
+            kind = rule.get("kind", "positional")
+            if rule.get("type_from") == "first_named_child":
+                tp = text(pd.named_children[0]) if pd.named_children else None
+            else:
+                tp = text(pd.child_by_field_name(rule["type_field"])) or None \
+                    if "type_field" in rule else None
+            names: list[str] = []
+            if "name_field" in rule:
+                nm = pd.child_by_field_name(rule["name_field"])
+                if nm is not None:
+                    names = [text(nm)]
+            elif "name_from" in rule:
+                nf = rule["name_from"]
+                child = next((c for c in pd.named_children if c.type == nf["child_type"]), None)
+                if child is not None:
+                    nm = child.child_by_field_name(nf["field"])
+                    names = [text(nm)] if nm is not None else []
+            elif rule.get("names_from_children"):
+                names = [text(c) for c in pd.children
+                         if c.type == rule["names_from_children"]]
+                if names and rule.get("first_only"):
+                    names = names[:1]
+            if rule.get("bare_text"):
+                names = [text(pd)]
+            if not names:
+                fallback = rule.get("fallback", "arg{i}")
+                names = [fallback.format(i=len(out))]
+            out.extend(RawParam(name=n, raw_type=tp, kind=kind) for n in names)
+        return out
+
+    # ------------------------------------------------- declared/writes/reads
+
+    def _declared(self, node) -> set[str]:
+        names: set[str] = set()
+        for f in self.p.declare.get("param_fields", ["parameters"]):
+            pl = node.child_by_field_name(f)
+            if pl is not None:
+                names.update(text(n) for n in walk(pl) if n.type == "identifier")
+        body = _field_or_self(node, "body")
+        rules = self.p.declare.get("nodes", {})
+        for n in walk_own(body, self.boundaries):
+            rule = rules.get(n.type)
+            if rule is None:
+                continue
+            if "child_type" in rule:
+                for c in n.named_children:
+                    if c.type == rule["child_type"]:
+                        nm = c.child_by_field_name(rule.get("name_field", "name"))
+                        if nm is not None:
+                            names.add(text(nm))
+            elif rule.get("children") == "identifier":
+                names.update(text(c) for c in n.children if c.type == "identifier")
+            elif "field" in rule:
+                target = n.child_by_field_name(rule["field"])
+                if target is not None:
+                    names.update(text(x) for x in walk(target) if x.type == "identifier")
+        return names
+
+    def _writes(self, node) -> set[str]:
+        spec = self.p.writes
+        body = _field_or_self(node, "body")
+        targets: set[str] = set()
+        for n in walk_own(body, self.boundaries):
+            if n.type in spec.get("assign", ()):
+                left = n.child_by_field_name(spec.get("assign_field", "left"))
+                if left is None:
+                    continue
+                if spec.get("assign_idents", "walk") == "walk":
+                    targets.update(text(x) for x in walk(left) if x.type == "identifier")
+                elif left.type == "identifier":
+                    targets.add(text(left))
+            elif n.type in spec.get("update", ()):
+                targets.update(text(x) for x in walk(n) if x.type == "identifier")
+        return targets
+
+    def _reads(self, node) -> set[str]:
+        body = _field_or_self(node, "body")
+        return {text(n) for n in walk_own(body, self.boundaries) if n.type == "identifier"}
+
+    def _closure_state(self, node, anc_declared: set[str], floor: str) -> str:
+        own = self._declared(node)
+        writes = {w for w in self._writes(node) if w not in own and w in anc_declared}
+        if writes:
+            return "mutates_captured"
+        if floor != "pure":
+            return floor
+        reads = {r for r in self._reads(node) if r not in own and r in anc_declared}
+        return "reads_captured" if reads else "pure"
+
+    def _instance_state(self, node) -> str:
+        spec = self.p.instance
+        prefix = spec.get("member_prefix", "this.")
+        body = _field_or_self(node, "body")
+        reads = False
+        for n in walk_own(body, self.boundaries):
+            if n.type in spec.get("assign", ()) :
+                left = n.child_by_field_name("left")
+                if left is not None and text(left).startswith(prefix):
+                    return "mutates_instance"
+            elif n.type in spec.get("update", ()):
+                if text(n).startswith(prefix):
+                    return "mutates_instance"
+            elif n.type == spec.get("this_node", "this"):
+                reads = True
+        return "reads_instance" if reads else "pure"
+
+    # ---------------------------------------------------------------- calls
+
+    def _calls(self, node) -> list[str]:
+        spec = self.p.calls
+        body = _field_or_self(node, "body")
+        boundaries = set(spec.get("boundaries", []))
+        calls: list[str] = []
+        for n in walk_own(body, boundaries):
+            if n.type != spec.get("node"):
+                continue
+            if "compose" in spec:
+                obj = n.child_by_field_name(spec["compose"]["object"])
+                name = n.child_by_field_name(spec["compose"]["name"])
+                if name is None:
+                    continue
+                t = (text(obj) + "." if obj is not None else "") + text(name)
+            else:
+                fn = n.child_by_field_name(spec.get("field", "function"))
+                if fn is None:
+                    continue
+                t = text(fn)
+            for old, new in spec.get("replace", {}).items():
+                t = t.replace(old, new)
+            if spec.get("known_only") and t not in self.known_fn_names:
+                continue
+            if self.call_re is not None and not self.call_re.match(t):
+                continue
+            if t not in calls:
+                calls.append(t)
+        return calls
+
+    # ----------------------------------------------------------------- emit
+
+    def _is_async(self, node) -> bool:
+        spec = self.p.raw.get("is_async")
+        if not spec:
+            return False
+        return any(c.type == spec["child_type"] for c in node.children)
+
+    def emit(self, node, name, kind, scope, classes, params, state,
+             returns_raw=None, returns_norm=None) -> None:
+        doc_types = self.p.doc.get("types")
+        self.decls.append(RawDecl(
+            name=name,
+            kind=kind,
+            language=self.p.language,
+            file=self.rel_path,
+            start_line=node.start_point[0] + 1,
+            end_line=node.end_point[0] + 1,
+            scope_chain=list(scope),
+            class_chain=list(classes),
+            params=params,
+            returns_raw=returns_raw,
+            returns_norm=returns_norm,
+            is_async=self._is_async(node),
+            doc=_clean_doc(
+                preceding_doc(node, set(doc_types) if doc_types else None),
+                self.p.doc.get("clean"),
+            ),
+            body_text=text(node),
+            calls=self._calls(node),
+            imports=list(self.imports),
+            state_capture=state,
+        ))
+
+    # ---------------------------------------------------------------- walks
+
+    def run(self) -> list[RawDecl]:
+        if self.p.mode == "flat":
+            self._run_flat()
+        else:
+            self._visit(self.root, [], [], set(), False)
+        return self.decls
+
+    def _run_flat(self) -> None:
+        decl_types = set(self.p.declarations)
+        nodes = [n for n in walk(self.root) if n.type in decl_types]
+        name_field = next(iter(self.p.declarations.values())).get("name", {}).get("field", "name")
+        self.known_fn_names = {text(n.child_by_field_name(name_field)) for n in nodes}
+        fixed = self.p.fixed_signature or {}
+        params = [RawParam(**pspec) for pspec in fixed.get("params", [])]
+        for node in nodes:
+            self.emit(
+                node, text(node.child_by_field_name(name_field)), "function",
+                [], [], list(params), "pure",
+                returns_norm=fixed.get("returns_norm"),
+            )
+
+    def _visit(self, node, scope, classes, anc_declared, in_func) -> None:
+        for child in node.children:
+            t = child.type
+            container = self.p.containers.get(t)
+            spec = self.p.declarations.get(t)
+            if container is not None:
+                cname = text(child.child_by_field_name(container.get("name_field", "name")))
+                new_classes = [*classes, cname] if container.get("role") == "class" else classes
+                self._visit(child, [*scope, cname], new_classes, anc_declared, in_func)
+            elif spec is not None:
+                self._handle(child, spec, scope, classes, anc_declared, in_func)
+            else:
+                self._visit(child, scope, classes, anc_declared, in_func)
+
+    def _handle(self, node, spec, scope, classes, anc_declared, in_func) -> None:
+        if "handler" in spec:
+            HOOKS[spec["handler"]](self, node, spec, scope, classes, anc_declared, in_func)
+            return
+        name_spec = spec.get("name")
+        name = (text(node.child_by_field_name(name_spec["field"]))
+                if isinstance(name_spec, dict) else name_spec)
+        kind = spec.get("kind", "function")
+        if kind == "auto":
+            kind = "method" if classes else ("closure" if in_func else "function")
+        capture = spec.get("capture", "fixed")
+        if capture == "closure":
+            state = self._closure_state(node, anc_declared, spec.get("floor", "pure"))
+        elif capture == "instance_this":
+            state = self._instance_state(node)
+        else:
+            state = spec.get("state", "pure")
+        params = self._params(node)
+        returns_raw = None
+        if spec.get("returns"):
+            rt = node.child_by_field_name(spec["returns"]["field"])
+            returns_raw = text(rt) or None if rt is not None else None
+        returns_norm = None
+        if self.p.returns_norm_hook:
+            returns_norm = HOOKS[self.p.returns_norm_hook](self, node)
+        self.emit(node, name, kind, scope, classes, params, state, returns_raw, returns_norm)
+        mode = spec.get("recurse_scope", "name" if isinstance(name_spec, dict) else "anon")
+        if mode == "same":
+            new_scope = scope
+        elif mode == "anon":
+            new_scope = [*scope, f"anon{node.start_point[0] + 1}"]
+        else:
+            new_scope = [*scope, name]
+        self._visit(node, new_scope, classes,
+                    anc_declared | self._declared(node), True)
+
+
+def extract_with_profile(profile: LanguageProfile, rel_path: str, source: str) -> list[RawDecl]:
+    return ProfileWalker(profile, rel_path, source).run()
+
+
+# ------------------------------------------------------------- hook library
+
+@hook("go_multi_return")
+def _go_multi_return(walker: ProfileWalker, node) -> str:
+    from spindlebox.typenorm import go_return
+    result = node.child_by_field_name("result")
+    if result is None:
+        types = []
+    elif result.type == "parameter_list":
+        types = []
+        for pd in result.named_children:
+            tp = pd.child_by_field_name("type")
+            types.append(text(tp) if tp is not None else text(pd))
+    else:
+        types = [text(result)]
+    return go_return(types)
+
+
+@hook("go_method")
+def _go_method(walker: ProfileWalker, node, spec, scope, classes, anc_declared, in_func):
+    """Go method_declaration: explicit receiver param, receiver-based state."""
+    name = text(node.child_by_field_name("name"))
+    params = walker._params(node)
+    recv = node.child_by_field_name("receiver")
+    recv_name, recv_type = "", ""
+    if recv is not None and recv.named_children:
+        pd = recv.named_children[0]
+        idents = [text(c) for c in pd.children if c.type == "identifier"]
+        recv_name = idents[0] if idents else ""
+        recv_type = text(pd.child_by_field_name("type")).lstrip("*")
+        params.insert(0, RawParam(name=recv_name or "recv", raw_type=recv_type, kind="receiver"))
+
+    state = "pure"
+    if recv_name:
+        body = node.child_by_field_name("body")
+        writes = walker._writes(node)
+        reads = False
+        if body is not None:
+            for n in walk_own(body, {"func_literal"}):
+                if n.type == "selector_expression":
+                    operand = n.child_by_field_name("operand")
+                    if operand is not None and text(operand) == recv_name:
+                        reads = True
+        if recv_name in writes:
+            state = "mutates_instance"
+        else:
+            done = False
+            if body is not None:
+                for n in walk_own(body, {"func_literal"}):
+                    if n.type == "assignment_statement":
+                        left = n.child_by_field_name("left")
+                        if left is not None and any(
+                            x.type == "selector_expression"
+                            and text(x.child_by_field_name("operand") or x) == recv_name
+                            for x in walk(left)
+                        ):
+                            state = "mutates_instance"
+                            done = True
+                            break
+            if not done and state == "pure":
+                state = "reads_instance" if reads else "pure"
+
+    rt = node.child_by_field_name("result")
+    returns_norm = HOOKS[walker.p.returns_norm_hook](walker, node) \
+        if walker.p.returns_norm_hook else None
+    walker.emit(node, name, "method",
+                [recv_type] if recv_type else [], [recv_type] if recv_type else [],
+                params, state, text(rt) or None if rt is not None else None, returns_norm)
+    walker._visit(node, [*scope, name], classes,
+                  anc_declared | walker._declared(node), True)
+
+
+@hook("bash_source_imports")
+def _bash_source_imports(walker: ProfileWalker) -> list[str]:
+    imports = []
+    for n in walk(walker.root):
+        if n.type == "command":
+            name_node = n.child_by_field_name("name")
+            if name_node is not None and text(name_node) in ("source", "."):
+                args = [c for c in n.children if c.type in ("word", "string", "raw_string")]
+                if args:
+                    imports.append(text(args[-1]).strip("'\""))
+    return imports

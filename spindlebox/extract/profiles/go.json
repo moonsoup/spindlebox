@@ -1,0 +1,65 @@
+{
+  "language": "go",
+  "extensions": [".go"],
+  "grammar": {"module": "tree_sitter_go", "attr": "language", "name": "go"},
+  "walker": true,
+  "mode": "nested",
+  "boundaries": ["func_literal", "function_declaration", "method_declaration"],
+  "imports": [{"node": "import_spec", "field": "path", "strip": "\""}],
+  "calls": {
+    "node": "call_expression",
+    "field": "function",
+    "pattern": "^[A-Za-z_][\\w]*(\\.[\\w]+)*$",
+    "boundaries": ["func_literal"]
+  },
+  "doc": {},
+  "declare": {
+    "param_fields": ["parameters", "receiver"],
+    "nodes": {
+      "short_var_declaration": {"field": "left"},
+      "var_spec": {"children": "identifier"},
+      "range_clause": {"field": "left"}
+    }
+  },
+  "writes": {
+    "assign": ["assignment_statement"],
+    "assign_field": "left",
+    "assign_idents": "walk",
+    "update": ["inc_statement", "dec_statement"]
+  },
+  "params": {
+    "field": "parameters",
+    "nodes": {
+      "parameter_declaration": {
+        "type_field": "type",
+        "names_from_children": "identifier",
+        "fallback": "arg{i}"
+      },
+      "variadic_parameter_declaration": {
+        "type_field": "type",
+        "names_from_children": "identifier",
+        "first_only": true,
+        "kind": "variadic",
+        "fallback": "args"
+      }
+    }
+  },
+  "declarations": {
+    "function_declaration": {
+      "kind": "function",
+      "name": {"field": "name"},
+      "returns": {"field": "result"},
+      "state": "pure"
+    },
+    "method_declaration": {"handler": "go_method"},
+    "func_literal": {
+      "kind": "closure",
+      "name": "<closure>",
+      "returns": {"field": "result"},
+      "capture": "closure",
+      "floor": "reads_captured",
+      "recurse_scope": "same"
+    }
+  },
+  "returns_norm_hook": "go_multi_return"
+}

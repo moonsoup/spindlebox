@@ -22,6 +22,11 @@ from spindlebox.typenorm import normalize
 
 
 def _extract_file(lang: str, rel: str, source: str) -> list[RawDecl]:
+    from spindlebox.extract.profile_registry import profile_for
+    prof = profile_for(lang)
+    if prof is not None and prof.walker:
+        from spindlebox.extract.profile_lang import extract_with_profile
+        return extract_with_profile(prof, rel, source)
     if lang == "python":
         from spindlebox.extract.py_lang import extract_python_file
         return extract_python_file(rel, source)

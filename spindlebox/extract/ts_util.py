@@ -29,7 +29,15 @@ def get_language(name: str) -> Language:
         import tree_sitter_bash as mod
         lang = Language(mod.language())
     else:
-        raise ValueError(f"no tree-sitter grammar for '{name}'")
+        # declarative language profiles carry their own grammar spec
+        import importlib
+
+        from spindlebox.extract.profile_registry import grammar_for
+        spec = grammar_for(name)
+        if spec is None:
+            raise ValueError(f"no tree-sitter grammar for '{name}'")
+        mod = importlib.import_module(spec["module"])
+        lang = Language(getattr(mod, spec["attr"])())
     _LANGS[name] = lang
     return lang
 

@@ -69,6 +69,19 @@ class RawDecl:
     state_capture: str = "pure"
 
 
+def _register_profiles() -> None:
+    """Extend the language tables with declaratively-profiled languages."""
+    from spindlebox.extract.profile_registry import all_profiles
+    for prof in all_profiles().values():
+        for ext in prof.extensions:
+            EXT_MAP.setdefault(ext, prof.language)
+        if prof.language not in ALL_LANGS:
+            ALL_LANGS.append(prof.language)
+
+
+_register_profiles()
+
+
 def normalize_langs(langs: list[str] | None) -> list[str]:
     if not langs:
         return list(ALL_LANGS)

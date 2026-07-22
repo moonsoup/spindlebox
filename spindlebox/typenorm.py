@@ -278,6 +278,77 @@ def _rust(s: str | None) -> str:
     return f"obj:{s}"
 
 
+# ------------------------------------------------------- table-driven (profiles)
+
+# Languages added via declarative profiles register a normalization table here
+# instead of writing a per-language function. The table vocabulary:
+#   simple:         {"String": "str", ...} exact-match spellings
+#   list_bases / map_bases / set_bases / optional_bases / iter_bases /
+#   fn_bases / unwrap_bases:  generic base names per core-1 container
+#   generic:        ["<", ">"] bracket pair for generics
+#   array_suffix:   e.g. "[]" -> list<T>  ("byte[]" checked in simple first)
+#   unannotated:    core-1 type when no annotation is present
+_TYPE_TABLES: dict[str, dict] = {}
+_FIXED_TYPES: dict[str, str] = {}
+
+
+def register_table(language: str, table: dict) -> None:
+    _TYPE_TABLES[language] = table
+
+
+def register_fixed(language: str, value: str) -> None:
+    """Every type in this language normalizes to one core-1 type (bash pattern)."""
+    _FIXED_TYPES[language] = value
+
+
+def _table(s: str, table: dict) -> str:
+    s = s.strip()
+    if not s:
+        return table.get("unannotated", "any")
+    simple = table.get("simple", {})
+    if s in simple:
+        return simple[s]
+    suffix = table.get("array_suffix")
+    if suffix and s.endswith(suffix):
+        return f"list<{_table(s[: -len(suffix)], table)}>"
+    open_ch, close_ch = table.get("generic", ["<", ">"])
+    g = _generic(s, open_ch, close_ch)
+    if g:
+        base, args = g
+        short = base.rsplit(".", 1)[-1]
+        if short in table.get("fn_bases", ()):
+            return "fn"
+        if short in table.get("list_bases", ()):
+            return f"list<{_table(args[0], table) if args else 'any'}>"
+        if short in table.get("map_bases", ()):
+            k = _table(args[0], table) if args else "any"
+            v = _table(args[1], table) if len(args) > 1 else "any"
+            return f"map<{k},{v}>"
+        if short in table.get("set_bases", ()):
+            return f"set<{_table(args[0], table) if args else 'any'}>"
+        if short in table.get("optional_bases", ()):
+            return f"option<{_table(args[0], table) if args else 'any'}>"
+        if short in table.get("iter_bases", ()):
+            return f"iter<{_table(args[0], table) if args else 'any'}>"
+        if short in table.get("unwrap_bases", ()):
+            return _table(args[0], table) if args else "any"
+        return f"obj:{short}"
+    short = s.rsplit(".", 1)[-1]
+    if short in simple:
+        return simple[short]
+    if short in table.get("fn_bases", ()):
+        return "fn"
+    if short in table.get("list_bases", ()):
+        return "list<any>"
+    if short in table.get("map_bases", ()):
+        return "map<any,any>"
+    if short in table.get("set_bases", ()):
+        return "set<any>"
+    if short in table.get("iter_bases", ()):
+        return "iter<any>"
+    return f"obj:{short}"
+
+
 # ---------------------------------------------------------------- entry
 
 _LANG_FNS = {
@@ -304,6 +375,14 @@ def normalize(raw: str | None, language: str) -> str:
     """Normalize a raw source-language type string into the core-1 vocabulary."""
     if language == "bash":
         return "str"
+    if language in _FIXED_TYPES:
+        return _FIXED_TYPES[language]
+    if language in _TYPE_TABLES:
+        table = _TYPE_TABLES[language]
+        if raw is None:
+            return table.get("unannotated", "any")
+        result = _table(" ".join(raw.split()), table)
+        return result if _is_clean_core1(result) else "any"
     fn = _LANG_FNS.get(language)
     if fn is None:
         return "any"

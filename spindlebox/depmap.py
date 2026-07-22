@@ -34,10 +34,24 @@ _ENV_PATTERNS["tsx"] = _ENV_PATTERNS["javascript"]
 
 _RUST_BUILTIN_ROOTS = {"crate", "self", "super", "std", "core", "alloc", "test", "proc_macro"}
 
+# Registered by declarative language profiles (profile_registry) — never
+# consulted for the languages hardcoded above, so existing behavior is fixed.
+_PROFILE_ENV: dict[str, list[re.Pattern]] = {}
+_PROFILE_IMPORTS: dict[str, dict] = {}
+
+
+def register_deps(language: str, env_patterns: list[str], imports_rule: dict | None) -> None:
+    _PROFILE_ENV[language] = [re.compile(p) for p in env_patterns]
+    if imports_rule:
+        _PROFILE_IMPORTS[language] = imports_rule
+
 
 def find_env_vars(body: str, language: str) -> list[str]:
     found: set[str] = set()
-    for pat in _ENV_PATTERNS.get(language, []):
+    pats = _ENV_PATTERNS.get(language)
+    if pats is None:
+        pats = _PROFILE_ENV.get(language, [])
+    for pat in pats:
         found.update(pat.findall(body))
     return sorted(found)
 
@@ -68,6 +82,13 @@ def external_packages(imports: list[str], language: str, local_roots: set[str]) 
                 ext.add(root)
         elif language == "bash":
             ext.add(imp)
+        elif language in _PROFILE_IMPORTS:
+            rule = _PROFILE_IMPORTS[language]
+            root = imp.split(".")[0]
+            if root in rule.get("stdlib_roots", ()) or root in local_roots:
+                continue
+            pkg = imp.rsplit(".", 1)[0] if rule.get("drop_last_segment") and "." in imp else imp
+            ext.add(pkg)
     return sorted(ext)
 
 
