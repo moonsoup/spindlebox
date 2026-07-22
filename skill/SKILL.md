@@ -45,6 +45,8 @@ spindlebox index <project-root>      # refresh; ordinals are sticky across rebui
 | `spindlebox validate [<path>] [--strict]` | compile-time validation: op-array homogeneity, sig-class membership, ctx type consistency, pipeline soundness |
 | `spindlebox call <addr> --ctx '{"key": val}'` | live-invoke a Python item through the normalized context |
 | `spindlebox pipeline define <name> <stage>...` | define + type-check an ordered pipeline |
+| `spindlebox gaps [--kind K] [--min-severity S] [--json]` | find gaps: dead items, unprovided ctx keys, unresolvable calls, near-duplicate clusters |
+| `spindlebox workflows [--min-confidence C] [--json]` | mine candidate cross-function pipelines (call + ctx chaining, ranked by confidence; `pipeline define`-compatible) |
 | `spindlebox generate --lang rust [--out DIR] [--group G]` | skeleton crate: Ctx struct, sig-class aliases, todo!() stubs, Vec<CtxOp> op arrays |
 | `spindlebox projects list\|add\|remove` | registry management |
 

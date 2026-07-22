@@ -349,6 +349,44 @@ def cmd_generate(args) -> int:
     return 0
 
 
+def cmd_gaps(args) -> int:
+    from spindlebox.gaps import find_gaps
+    idx, _root = _load_project(args)
+    gaps = find_gaps(idx)
+    if args.kind:
+        gaps = [g for g in gaps if g["kind"] == args.kind]
+    if args.min_severity:
+        order = {"high": 0, "medium": 1, "low": 2}
+        cutoff = order[args.min_severity]
+        gaps = [g for g in gaps if order.get(g["severity"], 3) <= cutoff]
+    if args.json:
+        print(json.dumps(gaps, indent=1))
+        return 0
+    if not gaps:
+        print("no gaps found")
+        return 0
+    for g in gaps:
+        loc = g.get("address") or ", ".join(g.get("members", []))
+        print(f"[{g['severity']:>6}] {g['kind']:<20} {loc}  — {g['detail']}")
+    return 0
+
+
+def cmd_workflows(args) -> int:
+    from spindlebox.workflows import mine_workflows
+    idx, _root = _load_project(args)
+    flows = mine_workflows(idx, min_confidence=args.min_confidence)
+    if args.json:
+        print(json.dumps(flows, indent=1))
+        return 0
+    if not flows:
+        print("no candidate workflows found")
+        return 0
+    for f in flows[: args.limit]:
+        chain = " → ".join(f["addresses"])
+        print(f"[conf {f['confidence']:.2f}] ({f['stages']} stages) {chain}")
+    return 0
+
+
 def cmd_install_skill(args) -> int:
     src = Path(__file__).resolve().parent.parent / "skill" / "SKILL.md"
     if not src.exists():
@@ -454,6 +492,22 @@ def build_parser() -> argparse.ArgumentParser:
     r = proj_sub.add_parser("remove")
     r.add_argument("name")
     p.set_defaults(func=cmd_projects)
+
+    p = sub.add_parser("gaps", help="find gaps in the software (dead items, unprovided ctx "
+                       "keys, unresolvable calls, near-duplicates)")
+    _add_project_arg(p)
+    p.add_argument("--kind", choices=["dead_item", "unprovided_ctx_key",
+                                      "unresolvable_call", "near_duplicate"])
+    p.add_argument("--min-severity", choices=["high", "medium", "low"], dest="min_severity")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_gaps)
+
+    p = sub.add_parser("workflows", help="mine candidate cross-function pipelines from the SPI")
+    _add_project_arg(p)
+    p.add_argument("--min-confidence", type=float, default=0.6, dest="min_confidence")
+    p.add_argument("--limit", type=int, default=50)
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_workflows)
 
     p = sub.add_parser("install-skill", help="install the spindlebox skill to ~/.claude/skills")
     p.set_defaults(func=cmd_install_skill)
