@@ -73,11 +73,16 @@ signature: `{group['signature']}`
 
 
 def reproduce_in_container(group: dict, exec_fn=common.container_exec) -> tuple[bool, str]:
-    """Re-run the standalone repro command; True = still fails (reproduced)."""
+    """Re-run the standalone repro command; True = still fails (reproduced).
+
+    Requires a self-contained repro_cmd. A bare stage `cmd` is NOT used as a
+    fallback: it may lack its working directory and fail for the wrong reason
+    (drill finding: bare `cargo check` fails anywhere with no crate, producing
+    false reproductions that wrongly reopened fixed issues)."""
     sample = group["sample"] or {}
-    cmd = sample.get("repro_cmd") or sample.get("cmd")
+    cmd = sample.get("repro_cmd")
     if not cmd:
-        return False, "(no command recorded)"
+        return False, "(no standalone repro_cmd recorded — cannot reproduce)"
     proc = exec_fn(cmd)
     output = (proc.stdout + "\n" + proc.stderr).strip()
     return proc.returncode != 0, output

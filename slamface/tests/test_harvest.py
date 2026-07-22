@@ -49,3 +49,16 @@ def test_since_run_filter(tmp_path):
     write_failures(tmp_path, "r-3", [rec("bbbbbbbbbbbb", "r-3")])
     result = harvest(tmp_path, [], since_run="r-2")
     assert [g["signature"] for g in result["new"]] == ["bbbbbbbbbbbb"]
+
+
+def test_only_run_scopes_to_single_run(tmp_path):
+    write_failures(tmp_path, "r-old", [rec("aaaaaaaaaaaa", "r-old")])
+    write_failures(tmp_path, "r-new", [rec("bbbbbbbbbbbb", "r-new")])
+    result = harvest(tmp_path, [], only_run="r-new")
+    assert [g["signature"] for g in result["new"]] == ["bbbbbbbbbbbb"]
+
+
+def test_only_run_absent_file_is_empty(tmp_path):
+    write_failures(tmp_path, "r-old", [rec("aaaaaaaaaaaa", "r-old")])
+    result = harvest(tmp_path, [], only_run="r-missing")
+    assert result == {"new": [], "recurring": [], "regressed": []}

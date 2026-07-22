@@ -89,3 +89,14 @@ def test_reproduction_uses_standalone_repro_cmd():
     process({"new": [group("eeeeeeeeeeee")], "recurring": [], "regressed": []},
             tier=0, exec_fn=exec_fn, gh_fn=gh)
     assert seen and seen[0].startswith("cd /corpus/self && ")
+
+
+def test_no_repro_cmd_is_not_reproduced():
+    """Drill finding: a record without a standalone repro_cmd must not falsely
+    reproduce (no bare-cmd fallback)."""
+    from slamface.ops.file_issues import reproduce_in_container
+    g = {"sample": {"cmd": "cargo check", "error": {}}}  # no repro_cmd
+    called = []
+    reproduced, msg = reproduce_in_container(
+        g, exec_fn=lambda c, **k: called.append(c))
+    assert reproduced is False and called == []

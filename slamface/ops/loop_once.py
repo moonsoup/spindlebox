@@ -90,8 +90,8 @@ def loop_once(tier: int | None = None, max_new: int = 5, deps=None) -> dict:
     state_dir = pull_state()
     issues = gh_json_fn(["issue", "list", "--search", "slamface in:title", "--state", "all",
                          "--limit", "500", "--json", "number,title,state"])
-    harvest = harvest_logs.harvest(state_dir / "logs", issues,
-                                   since_run=state.get("last_run_id"))
+    # scope strictly to THIS run's failures file — never reprocess historical logs
+    harvest = harvest_logs.harvest(state_dir / "logs", issues, only_run=run["run_id"])
     filing = file_issues.process(harvest, tier=tier, max_new=max_new,
                                  exec_fn=exec_fn, gh_fn=gh_fn)
     status["issues_new"] = len(filing["filed"])

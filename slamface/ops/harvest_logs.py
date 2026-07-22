@@ -21,8 +21,17 @@ _SIG_IN_TITLE = re.compile(r"\[slamface:([0-9a-f]{12})\]")
 
 def parse_failures(logs_dir: Path) -> dict[str, dict]:
     """Group failure records from all failures-*.jsonl by error signature."""
+    return _parse_files(sorted(logs_dir.glob("failures-*.jsonl")))
+
+
+def parse_failures_file(path: Path) -> dict[str, dict]:
+    """Group failures from a single run's failures-<run_id>.jsonl (empty if absent)."""
+    return _parse_files([path] if path.exists() else [])
+
+
+def _parse_files(paths: list[Path]) -> dict[str, dict]:
     groups: dict[str, dict] = {}
-    for path in sorted(logs_dir.glob("failures-*.jsonl")):
+    for path in paths:
         for line in path.read_text().splitlines():
             if not line.strip():
                 continue
@@ -65,11 +74,18 @@ def issue_signatures(issues: list[dict]) -> dict[str, dict]:
     return out
 
 
-def harvest(logs_dir: Path, issues: list[dict], since_run: str | None = None) -> dict:
-    groups = parse_failures(logs_dir)
-    if since_run:
-        groups = {s: g for s, g in groups.items()
-                  if any(r > since_run for r in g["run_ids"])}
+def harvest(logs_dir: Path, issues: list[dict], since_run: str | None = None,
+            only_run: str | None = None) -> dict:
+    if only_run is not None:
+        # scope to exactly one run's failures file — the correct default for the loop,
+        # so stale historical logs are never reprocessed (drill finding: wiping loop
+        # state reprocessed old pre-fix failures and wrongly reopened fixed issues)
+        groups = parse_failures_file(logs_dir / f"failures-{only_run}.jsonl")
+    else:
+        groups = parse_failures(logs_dir)
+        if since_run:
+            groups = {s: g for s, g in groups.items()
+                      if any(r > since_run for r in g["run_ids"])}
     known = issue_signatures(issues)
     result = {"new": [], "recurring": [], "regressed": []}
     for sig, group in sorted(groups.items()):
