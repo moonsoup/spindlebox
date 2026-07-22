@@ -18,15 +18,24 @@ _TB_FILE = re.compile(r'File "([^"]+)", line (\d+), in (\S+)')
 _TB_CLASS = re.compile(r"^(\w+(?:\.\w+)*(?:Error|Exception|Interrupt|Exit))\b:?\s*(.*)$", re.M)
 _ITEMS = re.compile(r"indexed \S+: (\d+) items, (\d+) signature classes")
 _RUSTC_ERR = re.compile(r"error\[(E\d+)\][^\n]*\n\s*-->\s*([^:\n]+)")
+_RUSTC_UNCODED = re.compile(r"error: ([^\n]+?)(?:\s*`[^`]*`)?\n")
+_BACKTICK = re.compile(r"`([^`]+)`")
 
 
 def _fail_trace_head(stage: str, output: str) -> str:
-    """Failure-mode identity for non-traceback failures. For cargo, the first rustc
-    error code + file makes distinct compile errors distinct signatures
-    (drill finding: '<stage> exit' collapsed unrelated cargo failures)."""
+    """Failure-mode identity for non-traceback failures. For cargo, distinct compile
+    errors must get distinct signatures (drill finding: '<stage> exit' collapsed
+    unrelated failures). Coded errors use their E#### + file; uncoded errors
+    (e.g. 'expected identifier, found reserved keyword `x`') use the message shape."""
     m = _RUSTC_ERR.search(output)
     if m:
         return f"{stage} {m.group(1)} {m.group(2).strip()}"
+    u = _RUSTC_UNCODED.search(output)
+    if u:
+        # keep the message shape; a backtick'd token distinguishes e.g. one keyword
+        msg = _BACKTICK.sub("X", u.group(1)).strip()
+        tok = _BACKTICK.search(output)
+        return f"{stage}: {msg}" + (f" [{tok.group(1)}]" if tok else "")
     return f"{stage} exit"
 
 

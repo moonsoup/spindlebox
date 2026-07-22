@@ -16,10 +16,14 @@ from spindlebox.generate.base import GeneratedFile, GeneratorBackend, GenOptions
 from spindlebox.schema import Group, Item, ScaIndex
 
 _RUST_KEYWORDS = {
+    # strict (2015 + 2018)
     "as", "async", "await", "box", "break", "const", "continue", "crate", "dyn",
     "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let",
     "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "static",
     "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while",
+    # reserved for future use — bare use is a parse error; r# escapes them
+    "abstract", "become", "do", "final", "macro", "override", "priv", "try",
+    "typeof", "unsized", "virtual", "yield", "union",
 }
 _NO_RAW = {"self", "Self", "super", "crate"}
 # Explicit remap table for identifier edge cases real-world code produces

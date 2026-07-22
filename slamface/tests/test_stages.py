@@ -64,3 +64,11 @@ def test_fail_trace_head_extracts_rustc_error():
            "    --> src/lib.rs:2455:21\n")
     assert _fail_trace_head("cargo_check", out) == "cargo_check E0618 src/lib.rs"
     assert _fail_trace_head("cargo_check", "garbage") == "cargo_check exit"
+
+
+def test_fail_trace_head_handles_uncoded_error():
+    from slamface.harness.stages import _fail_trace_head
+    out = "error: expected identifier, found reserved keyword `override`\n --> src/lib.rs:13005:85"
+    th = _fail_trace_head("cargo_check", out)
+    assert th != "cargo_check exit"
+    assert "override" in th or "reserved" in th

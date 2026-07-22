@@ -139,3 +139,13 @@ def test_param_list_identifiers_unique(files):
     for m in re.finditer(r"pub fn \w+\(([^)]*)\)", lib):
         names = [p.split(":")[0].strip() for p in m.group(1).split(",") if ":" in p]
         assert len(names) == len(set(names)), f"duplicate param name in: {m.group(0)}"
+
+
+def test_rust_reserved_keywords_escaped(files):
+    """Params named after Rust reserved-for-future keywords (pydantic T3) must be
+    r#-escaped, not emitted bare."""
+    lib = files["src/lib.rs"]
+    assert "pub fn reserved(" in lib
+    for kw in ("final", "override", "macro"):
+        assert f" {kw}:" not in lib, f"bare reserved keyword {kw} in a param"
+        assert f"r#{kw}" in lib
