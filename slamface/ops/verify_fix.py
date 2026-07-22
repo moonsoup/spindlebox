@@ -47,6 +47,12 @@ def verify(issue_number: int, runs: int = 3,
         proc = exec_fn(cmd, workdir=cwd or None)
         outputs.append(f"run {i + 1}: exit {proc.returncode}\n"
                        + (proc.stdout + proc.stderr).strip()[-400:])
+        if common.is_infra_error(proc):
+            # the repro could not be run (relative cwd, missing container, ...);
+            # that is NOT a reproduction — never reopen/label on it
+            return {"issue": issue_number, "verified": False,
+                    "reason": f"cannot verify: harness/exec error on run {i + 1} "
+                              f"(exit {proc.returncode}) — repro marker may be stale"}
         if proc.returncode != 0:
             gh_fn(["issue", "edit", str(issue_number), "--add-label", "state:fix-failed-verify"])
             gh_fn(["issue", "comment", str(issue_number), "--body",

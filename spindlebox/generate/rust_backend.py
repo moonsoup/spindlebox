@@ -56,6 +56,8 @@ def _mod_seg(name: str) -> str:
         return base
     h = hashlib.sha256(name.encode()).hexdigest()[:6]
     safe = base.strip("_") or "g"
+    if not safe[0].isalpha():  # module idents may not start with a digit/underscore (#9)
+        safe = "g" + safe
     return f"{safe}_{h}"
 
 

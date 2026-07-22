@@ -149,3 +149,12 @@ def test_rust_reserved_keywords_escaped(files):
     for kw in ("final", "override", "macro"):
         assert f" {kw}:" not in lib, f"bare reserved keyword {kw} in a param"
         assert f"r#{kw}" in lib
+
+
+def test_mod_seg_never_starts_with_digit():
+    """A numeric-derived group name must not yield a digit-leading module ident
+    (pydantic T3 #9: 'found 1_0_1_85518c')."""
+    from spindlebox.generate.rust_backend import _mod_seg
+    for name in ("1.0.1", "123", "0abc", "_1_"):
+        seg = _mod_seg(name)
+        assert not seg[0].isdigit(), f"{name} -> {seg} starts with a digit"

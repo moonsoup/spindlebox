@@ -27,8 +27,25 @@ def ssh(command: str, timeout: int = 120) -> subprocess.CompletedProcess:
 
 
 def container_exec(command: str, timeout: int = 900, workdir: str | None = None) -> subprocess.CompletedProcess:
-    wd = f"-w {workdir} " if workdir else ""
+    # docker exec -w requires an ABSOLUTE path; a relative workdir crashes with
+    # "Cwd must be an absolute path" (exit 128). Only pass -w when absolute;
+    # otherwise fold it into the command so it still runs.
+    if workdir and workdir.startswith("/"):
+        wd = f"-w {workdir} "
+    elif workdir:
+        command = f"cd {workdir} && {command}"
+        wd = ""
+    else:
+        wd = ""
     return ssh(f"docker exec {wd}{CONTAINER} sh -c {json.dumps(command)}", timeout=timeout)
+
+
+# exit codes / markers that mean "the harness could not run the repro", NOT
+# "the repro reproduced the failure" — must never be read as a reproduction.
+def is_infra_error(proc: subprocess.CompletedProcess) -> bool:
+    blob = (proc.stdout or "") + (proc.stderr or "")
+    return proc.returncode == 128 or "OCI runtime exec failed" in blob \
+        or "Cwd must be an absolute path" in blob or "No such container" in blob
 
 
 def pull_state(local_dir: Path | None = None) -> Path:

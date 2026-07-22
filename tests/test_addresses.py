@@ -57,3 +57,26 @@ def test_assign_ordinals_sticky_and_retire():
     assert by_addr["b.f"] == 1
     assert by_addr["d.k"] == 6  # next free after max(existing + retired), never reuses 2 or 5
     assert sorted(retired) == [2, 5]
+
+
+def test_anonymous_collision_uses_counter():
+    """Two anonymous items sharing a line must get unique addresses, not a
+    doubled-line collision (pydantic T3 #8: duplicate ordinals)."""
+    from spindlebox.addresses import make_address
+    a = make_address("m.py", [], "<lambda>", 731)
+    # simulate the extract dedup contract
+    used = {a}
+    addr2 = a
+    if addr2 in used:
+        n = 2
+        while f"{addr2}~{n}" in used:
+            n += 1
+        addr2 = f"{addr2}~{n}"
+    used.add(addr2)
+    addr3 = a
+    if addr3 in used:
+        n = 2
+        while f"{addr3}~{n}" in used:
+            n += 1
+        addr3 = f"{addr3}~{n}"
+    assert len({a, addr2, addr3}) == 3

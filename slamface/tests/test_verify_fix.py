@@ -67,3 +67,19 @@ def test_refuses_without_marker():
                     ssh_fn=ssh_fn, vps_head_fn=lambda: HEAD, origin_head_fn=lambda: HEAD)
     assert result["verified"] is False and "marker" in result["reason"]
     assert gh.calls == []
+
+
+def test_infra_error_does_not_reopen():
+    """An exec/OCI error (exit 128, relative cwd) is not a reproduction — verify
+    must not label/reopen on it (pydantic T3: #2 false reopen)."""
+    from types import SimpleNamespace
+    gh = Gh()
+
+    def infra_exec(cmd, workdir=None, timeout=900):
+        return SimpleNamespace(returncode=128, stdout="",
+                               stderr="OCI runtime exec failed: Cwd must be an absolute path")
+    result = verify(5, exec_fn=infra_exec, gh_json_fn=gh.json, gh_fn=gh.run,
+                    ssh_fn=ssh_fn, vps_head_fn=lambda: HEAD, origin_head_fn=lambda: HEAD)
+    assert result["verified"] is False and "cannot verify" in result["reason"]
+    assert not any(c[:2] == ["issue", "close"] for c in gh.calls)
+    assert not any("fix-failed-verify" in str(c) for c in gh.calls)

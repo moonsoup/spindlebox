@@ -100,3 +100,14 @@ def test_no_repro_cmd_is_not_reproduced():
     reproduced, msg = reproduce_in_container(
         g, exec_fn=lambda c, **k: called.append(c))
     assert reproduced is False and called == []
+
+
+def test_infra_error_not_reproduction():
+    """An exec/OCI error must not count as a reproduction (no false issue/reopen)."""
+    from slamface.ops.file_issues import reproduce_in_container
+    g = {"sample": {"repro_cmd": "cd x && cargo check", "error": {}}}
+
+    def infra(cmd, **k):
+        return SimpleNamespace(returncode=128, stdout="", stderr="OCI runtime exec failed")
+    reproduced, msg = reproduce_in_container(g, exec_fn=infra)
+    assert reproduced is False

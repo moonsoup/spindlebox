@@ -85,6 +85,8 @@ def reproduce_in_container(group: dict, exec_fn=common.container_exec) -> tuple[
         return False, "(no standalone repro_cmd recorded — cannot reproduce)"
     proc = exec_fn(cmd)
     output = (proc.stdout + "\n" + proc.stderr).strip()
+    if common.is_infra_error(proc):
+        return False, f"(harness/exec error, not a reproduction: {output[-200:]})"
     return proc.returncode != 0, output
 
 

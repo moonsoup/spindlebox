@@ -90,7 +90,14 @@ def build_index(
     for d in decls:
         address = make_address(d.file, d.scope_chain, d.name, d.start_line)
         if address in used_addresses:
-            address = f"{address}#{d.start_line}"
+            # multiple anonymous items can share a line (e.g. two lambdas on one
+            # line); append an incrementing counter so addresses stay unique —
+            # appending the (identical) line number did not disambiguate and
+            # produced duplicate ordinals (pydantic T3, #8)
+            n = 2
+            while f"{address}~{n}" in used_addresses:
+                n += 1
+            address = f"{address}~{n}"
         used_addresses.add(address)
 
         params = [
