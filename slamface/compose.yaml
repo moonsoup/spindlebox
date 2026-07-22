@@ -1,0 +1,21 @@
+services:
+  slamface:
+    build:
+      context: ..
+      dockerfile: slamface/Dockerfile
+    container_name: slamface_spindlebox
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SLAMFACE_TIER: ${SLAMFACE_TIER:-0}
+      SLAMFACE_INTERVAL: ${SLAMFACE_INTERVAL:-900}
+    volumes:
+      - slamface_state:/state
+    # NO ports (SSH-only access), NO docker.sock, NOT on the ies-caddy network.
+    restart: unless-stopped
+    mem_limit: 4g
+    pids_limit: 512
+
+volumes:
+  slamface_state:

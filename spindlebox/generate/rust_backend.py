@@ -160,7 +160,9 @@ class RustBackend(GeneratorBackend):
             if item.kind == "function":
                 out.append("")
                 out.append(f"{indent}pub fn {name}_op() -> crate::CtxOp {{")
-                out.append(f"{indent}    Box::new(move |ctx: &mut crate::Ctx| {{")
+                # the closure binding is reserved: a source param named 'ctx' (or even
+                # '__ctx') must never shadow it — see issue #1
+                out.append(f"{indent}    Box::new(move |__ctx: &mut crate::Ctx| {{")
                 call_args = []
                 for p in item.signature.params:
                     if p.kind in ("receiver", "kwvariadic"):
@@ -169,20 +171,22 @@ class RustBackend(GeneratorBackend):
                     key = ctx_ref.removeprefix("ctx.")
                     field = _ident(key)
                     var = _ident(p.name)
+                    if var == "__ctx":
+                        var = "__ctx_p"
                     if key in item.ctx_adapter.requires:
                         out.append(
-                            f"{indent}        let {var} = ctx.{field}.clone()"
+                            f"{indent}        let {var} = __ctx.{field}.clone()"
                             f".ok_or(crate::OpError::MissingCtxKey(\"{key}\"))?;"
                         )
                     else:
                         out.append(
-                            f"{indent}        let {var} = ctx.{field}.clone().unwrap_or_default();"
+                            f"{indent}        let {var} = __ctx.{field}.clone().unwrap_or_default();"
                         )
                     call_args.append(var)
                 out.append(f"{indent}        let result = {name}({', '.join(call_args)});")
                 if item.ctx_adapter.return_key:
                     rk = _ident(item.ctx_adapter.return_key)
-                    out.append(f"{indent}        ctx.{rk} = Some(result);")
+                    out.append(f"{indent}        __ctx.{rk} = Some(result);")
                 else:
                     out.append(f"{indent}        let _ = result;")
                 out.append(f"{indent}        Ok(())")

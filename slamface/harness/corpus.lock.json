@@ -1,0 +1,35 @@
+{
+  "weights_profiles": {
+    "default": {
+      "index_success": 25,
+      "zero_tracebacks": 25,
+      "validate_expected": 15,
+      "generate_compiles": 20,
+      "dispatch_roundtrip": 5,
+      "aux_probes": 10
+    },
+    "adversarial": {
+      "index_success": 15,
+      "zero_tracebacks": 40,
+      "validate_expected": 5,
+      "generate_compiles": 20,
+      "dispatch_roundtrip": 5,
+      "aux_probes": 15
+    }
+  },
+  "tiers": {
+    "0": {
+      "threshold": 95,
+      "weights_profile": "default",
+      "targets": [
+        {"name": "self", "path": "{app}", "lang": "multi", "expect_validate": "clean"},
+        {"name": "miniproj_py", "path": "{app}/tests/fixtures/miniproj_py", "lang": "python", "expect_validate": "clean", "dispatch": true},
+        {"name": "miniproj_js", "path": "{app}/tests/fixtures/miniproj_js", "lang": "typescript", "expect_validate": "clean"},
+        {"name": "miniproj_go", "path": "{app}/tests/fixtures/miniproj_go", "lang": "go", "expect_validate": "clean"},
+        {"name": "miniproj_rust", "path": "{app}/tests/fixtures/miniproj_rust", "lang": "rust", "expect_validate": "clean"},
+        {"name": "miniproj_bash", "path": "{app}/tests/fixtures/miniproj_bash", "lang": "bash", "expect_validate": "clean"},
+        {"name": "miniproj_mixed", "path": "{app}/tests/fixtures/miniproj_mixed", "lang": "multi", "expect_validate": "clean"}
+      ]
+    }
+  }
+}

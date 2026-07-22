@@ -1,0 +1,18 @@
+#!/bin/bash
+# Installed on the VPS at /usr/local/bin/slamface-deploy by provision.sh.
+# This is the ONLY thing the CI deploy key can execute (forced command).
+set -euo pipefail
+
+REPO_DIR=/opt/ies-platform/customers/slamface_spindlebox/repo
+export GIT_SSH_COMMAND="ssh -i /home/deploy/.ssh/spindlebox_repo_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+
+cd "$REPO_DIR"
+prev=$(git rev-parse HEAD 2>/dev/null || echo none)
+git fetch origin main
+git reset --hard origin/main
+echo "$prev" > /home/deploy/slamface_last_good
+
+docker compose -f slamface/compose.yaml build --quiet
+docker compose -f slamface/compose.yaml up -d
+docker compose -f slamface/compose.yaml ps
+echo "DEPLOYED $(git rev-parse HEAD) (previous: $prev)"

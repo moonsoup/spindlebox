@@ -76,3 +76,13 @@ def test_cargo_check(files, tmp_path):
         ["cargo", "check", "--quiet"], cwd=tmp_path, capture_output=True, text=True
     )
     assert proc.returncode == 0, proc.stderr
+
+
+def test_param_named_ctx_does_not_shadow(files):
+    """Issue #1: a source param named 'ctx' must not shadow the wrapper's Ctx binding."""
+    lib = files["src/lib.rs"]
+    assert "|__ctx: &mut crate::Ctx|" in lib
+    assert "pub fn wrap_op() -> crate::CtxOp" in lib
+    # the return-key write must target the closure binding, never a shadowed param
+    assert "__ctx.wrap_result = Some(result);" in lib
+    assert "\n                ctx.wrap_result" not in lib

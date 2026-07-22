@@ -7,6 +7,5 @@ build/
 .pytest_cache/
 .ruff_cache/
 .sca/
-!tests/fixtures/**/.sca/
 .spi/
-!tests/fixtures/**/.spi/
+slamface/.env

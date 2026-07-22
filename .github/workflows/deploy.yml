@@ -1,0 +1,36 @@
+name: test-and-deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    concurrency:
+      group: slamface-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to VPS (forced-command key)
+        env:
+          DEPLOY_KEY: ${{ secrets.SLAMFACE_DEPLOY_KEY }}
+        run: |
+          install -m 600 /dev/null deploy_key
+          printf '%s\n' "$DEPLOY_KEY" > deploy_key
+          ssh -i deploy_key \
+              -o StrictHostKeyChecking=accept-new \
+              -o ConnectTimeout=15 \
+              deploy@2.25.209.57 deploy
+          rm -f deploy_key
