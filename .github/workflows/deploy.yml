@@ -29,8 +29,18 @@ jobs:
         run: |
           install -m 600 /dev/null deploy_key
           printf '%s\n' "$DEPLOY_KEY" > deploy_key
-          ssh -i deploy_key \
-              -o StrictHostKeyChecking=accept-new \
-              -o ConnectTimeout=15 \
-              deploy@2.25.209.57 deploy
+          # GitHub runner → Hostinger SSH is intermittently flaky (transient
+          # connection timeouts); retry before failing the deploy.
+          for attempt in 1 2 3 4 5; do
+            if ssh -i deploy_key \
+                   -o StrictHostKeyChecking=accept-new \
+                   -o ConnectTimeout=20 \
+                   deploy@2.25.209.57 deploy; then
+              rm -f deploy_key
+              exit 0
+            fi
+            echo "deploy attempt $attempt failed; retrying in 15s"
+            sleep 15
+          done
           rm -f deploy_key
+          echo "deploy failed after 5 attempts"; exit 1
