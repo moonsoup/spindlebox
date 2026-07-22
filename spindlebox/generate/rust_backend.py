@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from spindlebox.generate.base import GeneratedFile, GeneratorBackend, GenOptions
 from spindlebox.schema import Group, Item, ScaIndex
 
@@ -28,6 +30,29 @@ _IDENT_REMAP = {
     "_": "blank",
     "": "field",
 }
+
+
+# Rust prelude type names a generated module must never shadow (a `pub mod Vec`
+# makes every `Vec<..>` inside resolve to the module — E0573).
+_PRELUDE_TYPES = {
+    "Vec", "String", "Option", "Result", "Box", "Rc", "Arc", "HashMap", "HashSet",
+    "BTreeMap", "BTreeSet", "Cow", "Cell", "RefCell", "Some", "None", "Ok", "Err",
+}
+
+
+def _mod_seg(name: str) -> str:
+    """Module-path segment for a group name. A pure function of the original name
+    (so both emission sites agree without sibling coordination). Plain identifiers
+    pass through; prelude-type names and lossily-sanitized exotic names (e.g. Rust
+    `&mut T` → `_mut__T_`) get a stable hash suffix so they neither shadow types
+    nor collide (memchr #6: E0573/E0428)."""
+    base = _ident(name)
+    clean = name.isidentifier() and not name.startswith("r#")
+    if clean and base not in _PRELUDE_TYPES:
+        return base
+    h = hashlib.sha256(name.encode()).hexdigest()[:6]
+    safe = base.strip("_") or "g"
+    return f"{safe}_{h}"
 
 
 def _ident(name: str) -> str:
@@ -209,7 +234,7 @@ class RustBackend(GeneratorBackend):
                 out.append(f"{indent}        Ok(())")
                 out.append(f"{indent}    }})")
                 out.append(f"{indent}}}")
-                mod_path = "::".join(_ident(p) for p in item.group.split("."))
+                mod_path = "::".join(_mod_seg(p) for p in item.group.split("."))
                 generated_ops.append((f"crate::{mod_path}::{name}_op()", item.address))
             return out
 
@@ -217,7 +242,7 @@ class RustBackend(GeneratorBackend):
 
         def emit_group(group: Group, indent: str) -> list[str]:
             out: list[str] = []
-            gname = _ident(group.name)
+            gname = _mod_seg(group.name)
             out.append(f"{indent}pub mod {gname} {{")
             used: set[str] = set()
             member_items = [

@@ -113,3 +113,20 @@ def test_no_malformed_type_aliases(files):
         assert "obj:" not in code, f"stray core-1 fragment in code: {line}"
         if code.strip().startswith("pub type Sig"):
             assert code.rstrip().endswith(";"), f"malformed alias: {line}"
+
+
+def test_mod_seg_prelude_and_collisions():
+    """Module segments must not shadow prelude types or collide when distinct
+    source names sanitize identically (memchr #6 deeper layer: E0573/E0428)."""
+    from spindlebox.generate.rust_backend import _mod_seg
+    # plain identifiers pass through unchanged
+    assert _mod_seg("io") == "io"
+    assert _mod_seg("Reader") == "Reader"
+    # prelude type names must be escaped (no `pub mod Vec` shadowing `Vec<..>`)
+    assert _mod_seg("Vec") != "Vec"
+    assert _mod_seg("String") != "String"
+    # distinct exotic names that sanitize alike get distinct segments
+    a, b = _mod_seg("&mut T"), _mod_seg("*mut T")
+    assert a != b
+    # deterministic
+    assert _mod_seg("&mut T") == a
