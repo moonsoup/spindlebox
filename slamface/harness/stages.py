@@ -50,9 +50,14 @@ def run_stage(
     lang: str,
     timeout: int = STAGE_TIMEOUT,
     expect_exit: tuple[int, ...] = (0,),
+    repro_cmd: str | None = None,
 ) -> dict:
+    """repro_cmd: standalone shell command (stable paths, cd included) that reproduces
+    this stage outside the run — this is what issues embed and verify_fix executes."""
     started = time.time()
-    record: dict = {"stage": stage, "lang": lang, "cmd": " ".join(cmd)}
+    record: dict = {"stage": stage, "lang": lang, "cmd": " ".join(cmd),
+                    "cwd": str(cwd),
+                    "repro_cmd": repro_cmd or f"cd {cwd} && {' '.join(cmd)}"}
     try:
         proc = subprocess.run(
             cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout
@@ -153,15 +158,19 @@ def run_target(target: dict, corpus_dir: Path, app_root: Path, scratch: Path) ->
         "show_smoke", spindlebox_cmd("show", "0-5"), repo_dir, lang))
 
     gen_dir = scratch / f"gen_{target['name']}"
+    # standalone repro chain with stable paths (scratch dirs are ephemeral)
+    regen = (f"cd {repo_dir} && python3 -m spindlebox generate --lang rust "
+             f"--out /tmp/repro_{target['name']}")
     gen_rec = run_stage(
         "generate_rust", spindlebox_cmd("generate", "--lang", "rust", "--out", str(gen_dir)),
-        repo_dir, lang)
+        repo_dir, lang, repro_cmd=regen)
     records.append(gen_rec)
 
     if gen_rec["status"] == "ok":
         if shutil.which("cargo"):
             records.append(run_stage(
-                "cargo_check", ["cargo", "check", "--quiet"], gen_dir, lang, timeout=900))
+                "cargo_check", ["cargo", "check", "--quiet"], gen_dir, lang, timeout=900,
+                repro_cmd=f"{regen} && cd /tmp/repro_{target['name']} && cargo check --quiet"))
         else:
             records.append({"stage": "cargo_check", "lang": lang, "status": "skip",
                             "duration_ms": 0, "exit_code": None,

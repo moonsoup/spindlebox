@@ -44,8 +44,8 @@ def repro_marker(cmd: str, cwd: str) -> str:
 def build_body(group: dict, repro_output: str, analysis: str | None) -> str:
     sample = group["sample"] or {}
     error = sample.get("error") or {}
-    cmd = sample.get("cmd", "")
-    cwd = sample.get("repo_dir", sample.get("repo", ""))
+    cmd = sample.get("repro_cmd") or sample.get("cmd", "")
+    cwd = ""  # repro_cmd embeds its own cd; marker cwd kept for schema stability
     hypothesis = analysis or "*(analysis pending — hypothesis to be added before fixing)*"
     return f"""## Evidence (slamface tier {group.get('tier')}, stage `{group['stage']}`)
 
@@ -73,12 +73,12 @@ signature: `{group['signature']}`
 
 
 def reproduce_in_container(group: dict, exec_fn=common.container_exec) -> tuple[bool, str]:
-    """Re-run the failing command; True = still fails (reproduced)."""
+    """Re-run the standalone repro command; True = still fails (reproduced)."""
     sample = group["sample"] or {}
-    cmd = sample.get("cmd")
+    cmd = sample.get("repro_cmd") or sample.get("cmd")
     if not cmd:
         return False, "(no command recorded)"
-    proc = exec_fn(cmd, workdir=sample.get("repo_dir"))
+    proc = exec_fn(cmd)
     output = (proc.stdout + "\n" + proc.stderr).strip()
     return proc.returncode != 0, output
 

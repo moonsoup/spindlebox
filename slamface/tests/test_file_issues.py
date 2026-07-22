@@ -7,8 +7,8 @@ def group(sig, cmd="spindlebox index /x"):
     return {"signature": sig, "stage": "index", "error_class": "KeyError",
             "trace_head": "spindlebox/x.py in f", "tier": 0, "count": 1,
             "repos": ["self"], "run_ids": ["r-1"],
-            "sample": {"cmd": cmd, "repo": "self",
-                       "error": {"log_excerpt": "trace..."}}}
+            "sample": {"cmd": cmd, "repro_cmd": f"cd /corpus/self && {cmd}",
+                       "repo": "self", "error": {"log_excerpt": "trace..."}}}
 
 
 def failing_exec(cmd, workdir=None, timeout=900):
@@ -76,3 +76,16 @@ def test_repro_marker_roundtrip():
     body = "text\n" + repro_marker('spindlebox index "/x y"', "/corpus/self") + "\nmore"
     cmd, cwd = extract_repro(body)
     assert cmd == 'spindlebox index "/x y"' and cwd == "/corpus/self"
+
+
+def test_reproduction_uses_standalone_repro_cmd():
+    seen = []
+
+    def exec_fn(cmd, workdir=None, timeout=900):
+        seen.append(cmd)
+        return SimpleNamespace(returncode=1, stdout="", stderr="err")
+
+    gh = GhRecorder()
+    process({"new": [group("eeeeeeeeeeee")], "recurring": [], "regressed": []},
+            tier=0, exec_fn=exec_fn, gh_fn=gh)
+    assert seen and seen[0].startswith("cd /corpus/self && ")
