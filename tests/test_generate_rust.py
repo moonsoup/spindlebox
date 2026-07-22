@@ -94,3 +94,22 @@ def test_fn_named_ctx_called_via_self_path(files):
     lib = files["src/lib.rs"]
     assert "pub fn __ctx(x: i64) -> i64" in lib
     assert "let result = self::__ctx(x);" in lib
+
+
+def test_blank_identifier_is_safe(files):
+    """A param/ctx key named '_' (Go/rust blank identifier, memchr/cobra #4/#5)
+    must never emit a bare reserved '_' in Rust."""
+    lib = files["src/lib.rs"]
+    assert "pub _:" not in lib
+    assert "\n    _ " not in lib and "let _ =" not in lib.replace("let _ = result;", "")
+
+
+def test_no_malformed_type_aliases(files):
+    """No generated code line (comments excluded) may contain a stray core-1
+    fragment like 'obj:' in a type position (memchr #6)."""
+    lib = files["src/lib.rs"]
+    for line in lib.splitlines():
+        code = line.split("//", 1)[0]  # sig_class strings legitimately live in comments
+        assert "obj:" not in code, f"stray core-1 fragment in code: {line}"
+        if code.strip().startswith("pub type Sig"):
+            assert code.rstrip().endswith(";"), f"malformed alias: {line}"

@@ -37,3 +37,7 @@ impl Reader {
 pub fn make_adder(n: i64) -> impl Fn(i64) -> i64 {
     move |x| x + n
 }
+
+pub fn blanked(_: i64, real: i64) -> i64 {
+    real
+}

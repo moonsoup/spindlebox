@@ -290,6 +290,16 @@ _LANG_FNS = {
 }
 
 
+# A normalized core-1 type may only contain these characters. Anything the
+# per-language mappers leak that violates this (multi-line real-world generics,
+# lifetimes, stray fragments) is not a usable type → collapse to `any`.
+_CORE1_ALLOWED = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_<>,:")
+
+
+def _is_clean_core1(t: str) -> bool:
+    return all(ch in _CORE1_ALLOWED for ch in t)
+
+
 def normalize(raw: str | None, language: str) -> str:
     """Normalize a raw source-language type string into the core-1 vocabulary."""
     if language == "bash":
@@ -300,4 +310,7 @@ def normalize(raw: str | None, language: str) -> str:
     if raw is None:
         # no annotation: dynamic languages → any; typed languages → unit (no return)
         return "any" if language in ("python", "javascript", "typescript", "tsx") else "unit"
-    return fn(raw)
+    # collapse whitespace so multi-line real-world types normalize as one line
+    result = fn(" ".join(raw.split()))
+    # guard: any residue outside the core-1 grammar makes the type unusable downstream
+    return result if _is_clean_core1(result) else "any"

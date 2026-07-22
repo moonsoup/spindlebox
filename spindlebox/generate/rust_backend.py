@@ -20,10 +20,24 @@ _RUST_KEYWORDS = {
     "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while",
 }
 _NO_RAW = {"self", "Self", "super", "crate"}
+# Explicit remap table for identifier edge cases real-world code produces
+# (SPI policy: edge cases handled by a serialized mapping per set, not inline
+# special-casing). '_' is Rust's reserved blank identifier — a param named '_'
+# (Go/Rust blank, TS unused) must not surface as a bare field/binding.
+_IDENT_REMAP = {
+    "_": "blank",
+    "": "field",
+}
 
 
 def _ident(name: str) -> str:
+    if name in _IDENT_REMAP:
+        return _IDENT_REMAP[name]
     out = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in name)
+    if out in _IDENT_REMAP:
+        return _IDENT_REMAP[out]
+    if set(out) == {"_"}:  # all-underscore identifiers are reserved-adjacent noise
+        return "blank" + str(len(out))
     if not out or out[0].isdigit():
         out = "_" + out
     if out in _NO_RAW:

@@ -125,3 +125,12 @@ def test_cross_language_agreement():
     assert normalize("list[str]", "python") == normalize("string[]", "typescript")
     assert normalize("list[str]", "python") == normalize("[]string", "go")
     assert normalize("list[str]", "python") == normalize("Vec<String>", "rust")
+
+
+def test_multiline_type_collapses_to_single_line():
+    """Real Rust tuple types span lines with trailing commas (memchr #6);
+    normalization must not emit newlines into downstream code."""
+    raw = "(\n  usize,\n  SearchBound<&'r Q>,\n)"
+    result = normalize(raw, "rust")
+    assert "\n" not in result
+    assert "obj:" not in result or all(" " not in seg for seg in result.split(","))
