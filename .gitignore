@@ -9,3 +9,4 @@ build/
 .sca/
 .spi/
 slamface/.env
+slamface/.local/

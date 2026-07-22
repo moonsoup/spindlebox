@@ -59,3 +59,28 @@ spindlebox index <project-root>      # refresh; ordinals are sticky across rebui
 - `spindlebox call` only invokes module-level Python functions; params are fed from the
   `--ctx` JSON via the item's ctx adapter (defaulted params optional).
 - The generator's output language is pluggable (`spindlebox/generate/`); `rust` ships first.
+
+## slamface hardening loop (VPS rig)
+
+The `slamface_spindlebox` container on the Hostinger VPS runs spindlebox against a
+tiered corpus and emits evidence JSONL. The outer loop runs locally, one iteration:
+
+```bash
+python3 -m slamface.ops.loop_once            # full iteration; prints SLAMFACE_STATUS {...}
+bash slamface/ops/status.sh                  # container health + latest score
+python3 -m slamface.ops.report --no-pull     # checkpoint report (score escalation)
+bash slamface/ops/deploy.sh [--rollback]     # manual deploy fallback
+```
+
+Protocol (mechanically enforced — do not bypass):
+- Issues are filed by `loop_once` only after the failing command RE-EXECUTES and fails
+  in the container (passes → logged as flaky, not filed). Cap 5 new per pass.
+- A cause written in an issue is a *hypothesis* until a fix is verified.
+- Fix commits must mention `slamface:<sig12>` so the loop links them to issues.
+- ONLY `slamface.ops.verify_fix` closes issues: 3× fresh-container repro at deployed
+  HEAD == origin/main, evidence comment with commit + image digest.
+- `next_action: checkpoint` fires every 10th run — STOP and show the user the report;
+  never continue past a checkpoint without their say-so.
+- Promotion to the next tier: 2 consecutive greens AND zero open slamface issues
+  (`python3 -m slamface.ops.loop_once --promote <tier>` after the loop says promote).
+- Heavy corpus work happens ONLY in the VPS container (local disk stays clean).
