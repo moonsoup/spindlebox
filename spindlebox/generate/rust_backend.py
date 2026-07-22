@@ -154,8 +154,23 @@ class RustBackend(GeneratorBackend):
             "#[derive(Default, Debug)]",
             "pub struct Ctx {",
         ]
+        # injective ctx-key -> Rust field-ident map: distinct keys can sanitize to
+        # the same ident (e.g. 'final' and its escaped form), which is a duplicate
+        # struct field (pydantic T3, E0124). Build once, deterministically, and use
+        # everywhere a ctx field is emitted or accessed.
+        ctx_fields: dict[str, str] = {}
+        used_fields: set[str] = set()
         for key in sorted(index.ctx_schema):
-            lines.append(f"    pub {_ident(key)}: Option<{rust_type(index.ctx_schema[key])}>,")
+            base = _ident(key)
+            ident = base
+            n = 2
+            while ident in used_fields:
+                ident = f"{base}_{n}"
+                n += 1
+            used_fields.add(ident)
+            ctx_fields[key] = ident
+        for key in sorted(index.ctx_schema):
+            lines.append(f"    pub {ctx_fields[key]}: Option<{rust_type(index.ctx_schema[key])}>,")
         lines += [
             "}",
             "",
@@ -235,7 +250,7 @@ class RustBackend(GeneratorBackend):
                         continue
                     ctx_ref = item.ctx_adapter.param_map.get(p.name, f"ctx.{p.name}")
                     key = ctx_ref.removeprefix("ctx.")
-                    field = _ident(key)
+                    field = ctx_fields.get(key, _ident(key))
                     if key in item.ctx_adapter.requires:
                         out.append(
                             f"{indent}        let {var} = __ctx.{field}.clone()"
@@ -251,7 +266,7 @@ class RustBackend(GeneratorBackend):
                 out.append(
                     f"{indent}        let result = self::{name}({', '.join(call_args)});")
                 if item.ctx_adapter.return_key:
-                    rk = _ident(item.ctx_adapter.return_key)
+                    rk = ctx_fields.get(item.ctx_adapter.return_key, _ident(item.ctx_adapter.return_key))
                     out.append(f"{indent}        __ctx.{rk} = Some(result);")
                 else:
                     out.append(f"{indent}        let _ = result;")

@@ -158,3 +158,12 @@ def test_mod_seg_never_starts_with_digit():
     for name in ("1.0.1", "123", "0abc", "_1_"):
         seg = _mod_seg(name)
         assert not seg[0].isdigit(), f"{name} -> {seg} starts with a digit"
+
+
+def test_ctx_struct_fields_unique(files):
+    """No two Ctx struct fields may share an identifier (pydantic T3 #E0124)."""
+    import re
+    lib = files["src/lib.rs"]
+    m = re.search(r"pub struct Ctx \{(.*?)\n\}", lib, re.S)
+    fields = re.findall(r"pub (\S+):", m.group(1))
+    assert len(fields) == len(set(fields)), "duplicate Ctx field"
