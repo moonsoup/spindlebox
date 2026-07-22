@@ -183,7 +183,10 @@ class RustBackend(GeneratorBackend):
                             f"{indent}        let {var} = __ctx.{field}.clone().unwrap_or_default();"
                         )
                     call_args.append(var)
-                out.append(f"{indent}        let result = {name}({', '.join(call_args)});")
+                # path-qualified call: a local binding (param named like the fn, or the
+                # __ctx binding when the fn itself is named __ctx) can never shadow it
+                out.append(
+                    f"{indent}        let result = self::{name}({', '.join(call_args)});")
                 if item.ctx_adapter.return_key:
                     rk = _ident(item.ctx_adapter.return_key)
                     out.append(f"{indent}        __ctx.{rk} = Some(result);")

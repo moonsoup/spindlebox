@@ -64,7 +64,8 @@ def gh_run(args: list[str], timeout: int = 60) -> str:
 
 
 def vps_head() -> str:
-    proc = ssh(f"git -C {VPS_REPO_DIR} rev-parse HEAD")
+    # the repo is owned by the deploy user; read it as that user (git ownership guard)
+    proc = ssh(f"sudo -u deploy git -C {VPS_REPO_DIR} rev-parse HEAD")
     if proc.returncode != 0:
         raise RuntimeError(f"cannot read VPS HEAD: {proc.stderr[-200:]}")
     return proc.stdout.strip()

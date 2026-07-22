@@ -86,3 +86,11 @@ def test_param_named_ctx_does_not_shadow(files):
     # the return-key write must target the closure binding, never a shadowed param
     assert "__ctx.wrap_result = Some(result);" in lib
     assert "\n                ctx.wrap_result" not in lib
+
+
+def test_fn_named_ctx_called_via_self_path(files):
+    """Drill finding: a function NAMED __ctx must be call-qualified so the wrapper's
+    __ctx binding cannot shadow it (rustc E0618)."""
+    lib = files["src/lib.rs"]
+    assert "pub fn __ctx(x: i64) -> i64" in lib
+    assert "let result = self::__ctx(x);" in lib

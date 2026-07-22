@@ -15,4 +15,4 @@ echo "== last heartbeats =="
 "${SSH[@]}" docker exec slamface_spindlebox tail -n 5 /state/logs/runner.jsonl 2>/dev/null \
   || echo "(no heartbeats yet)"
 echo "== deployed commit =="
-"${SSH[@]}" git -C /opt/ies-platform/customers/slamface_spindlebox/repo rev-parse HEAD
+"${SSH[@]}" sudo -u deploy git -C /opt/ies-platform/customers/slamface_spindlebox/repo rev-parse HEAD

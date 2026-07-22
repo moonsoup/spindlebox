@@ -96,8 +96,10 @@ def main(argv: list[str] | None = None) -> int:
     else:
         state = common.pull_state() if not args.no_pull else common.LOCAL_STATE
         logs_dir = state / "logs"
+    # match by title pattern, not label: titles carry the signature identity and
+    # survive label mistakes (drill finding: a hand-filed issue lacked the label)
     issues = common.gh_json([
-        "issue", "list", "--label", "slamface", "--state", "all",
+        "issue", "list", "--search", "slamface in:title", "--state", "all",
         "--limit", "500", "--json", "number,title,state",
     ])
     result = harvest(logs_dir, issues, args.since_run)

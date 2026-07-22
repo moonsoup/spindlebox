@@ -88,7 +88,7 @@ def loop_once(tier: int | None = None, max_new: int = 5, deps=None) -> dict:
                   threshold=run["threshold"])
 
     state_dir = pull_state()
-    issues = gh_json_fn(["issue", "list", "--label", "slamface", "--state", "all",
+    issues = gh_json_fn(["issue", "list", "--search", "slamface in:title", "--state", "all",
                          "--limit", "500", "--json", "number,title,state"])
     harvest = harvest_logs.harvest(state_dir / "logs", issues,
                                    since_run=state.get("last_run_id"))

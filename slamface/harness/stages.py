@@ -17,6 +17,17 @@ STAGE_TIMEOUT = 600  # seconds, per stage
 _TB_FILE = re.compile(r'File "([^"]+)", line (\d+), in (\S+)')
 _TB_CLASS = re.compile(r"^(\w+(?:\.\w+)*(?:Error|Exception|Interrupt|Exit))\b:?\s*(.*)$", re.M)
 _ITEMS = re.compile(r"indexed \S+: (\d+) items, (\d+) signature classes")
+_RUSTC_ERR = re.compile(r"error\[(E\d+)\][^\n]*\n\s*-->\s*([^:\n]+)")
+
+
+def _fail_trace_head(stage: str, output: str) -> str:
+    """Failure-mode identity for non-traceback failures. For cargo, the first rustc
+    error code + file makes distinct compile errors distinct signatures
+    (drill finding: '<stage> exit' collapsed unrelated cargo failures)."""
+    m = _RUSTC_ERR.search(output)
+    if m:
+        return f"{stage} {m.group(1)} {m.group(2).strip()}"
+    return f"{stage} exit"
 
 
 def parse_traceback(stderr: str) -> dict | None:
@@ -64,12 +75,13 @@ def run_stage(
                 record["metrics"] = {"items": int(m.group(1)), "sig_classes": int(m.group(2))}
         else:
             record["status"] = "fail"
+            trace_head = _fail_trace_head(stage, proc.stderr or proc.stdout)
             record["error"] = {
                 "class": "NonzeroExit",
                 "message": f"exit {proc.returncode}, expected {expect_exit}",
-                "trace_head": f"{stage} exit",
+                "trace_head": trace_head,
                 "log_excerpt": (proc.stderr or proc.stdout)[-4000:],
-                "signature": error_signature(stage, "NonzeroExit", f"{stage} exit", lang),
+                "signature": error_signature(stage, "NonzeroExit", trace_head, lang),
             }
     except subprocess.TimeoutExpired:
         record.update(

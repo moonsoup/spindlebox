@@ -56,3 +56,11 @@ def test_tier0_integration(tmp_path):
     result = run_tier(0, tmp_path, repo_root)
     assert result["stages"] > 10
     assert result["score"] >= 95, result
+
+
+def test_fail_trace_head_extracts_rustc_error():
+    from slamface.harness.stages import _fail_trace_head
+    out = ("error[E0618]: expected function, found `&mut Ctx`\n"
+           "    --> src/lib.rs:2455:21\n")
+    assert _fail_trace_head("cargo_check", out) == "cargo_check E0618 src/lib.rs"
+    assert _fail_trace_head("cargo_check", "garbage") == "cargo_check exit"

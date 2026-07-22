@@ -19,6 +19,22 @@ import sys
 from slamface.ops import common
 
 LABELS = ("slamface", "state:reproduced")
+_LABEL_DEFS = {
+    "slamface": ("b60205", "filed by the slamface hardening loop"),
+    "state:reproduced": ("fbca04", "failure mechanically reproduced in container"),
+    "state:fix-failed-verify": ("d93f0b", "a fix landed but verification failed"),
+}
+
+
+def ensure_labels(tier: int, gh_fn=common.gh_run) -> None:
+    """Idempotently create the labels the loop uses (gh errors on dupes are ignored)."""
+    defs = dict(_LABEL_DEFS)
+    defs[f"tier-{tier}"] = ("0e8a16", f"found at corpus tier {tier}")
+    for name, (color, desc) in defs.items():
+        try:
+            gh_fn(["label", "create", name, "--color", color, "--description", desc])
+        except RuntimeError:
+            pass  # already exists
 
 
 def repro_marker(cmd: str, cwd: str) -> str:
@@ -72,6 +88,8 @@ def process(harvest_result: dict, tier: int, max_new: int = 5,
             exec_fn=common.container_exec, gh_fn=common.gh_run) -> dict:
     analysis_map = analysis_map or {}
     outcome = {"filed": [], "flaky": [], "commented": [], "reopened": [], "deferred": []}
+    if harvest_result.get("new"):
+        ensure_labels(tier, gh_fn)
 
     for group in harvest_result.get("recurring", []):
         gh_fn(["issue", "comment", str(group["issue"]), "--body",
