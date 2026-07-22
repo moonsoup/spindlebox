@@ -184,13 +184,29 @@ class RustBackend(GeneratorBackend):
                 out[-1] = out[-1].replace("///", "//")
                 out.append(f"{indent}// internal item ({item.kind}) — not generated as a free fn")
                 return out
+            # dedupe param identifiers within this one list: distinct source params
+            # can map to the same ident (e.g. two blank '_' params → 'blank') which
+            # is a duplicate binding in Rust (serde_json #7, E0415)
+            sig_params = [p for p in item.signature.params
+                          if p.kind not in ("receiver", "kwvariadic")]
+            pidents: list[str] = []
+            seen_p: set[str] = set()
+            for p in sig_params:
+                base = _ident(p.name)
+                if base == "__ctx":
+                    base = "__ctx_p"
+                ident = base
+                n = 2
+                while ident in seen_p:
+                    ident = f"{base}_{n}"
+                    n += 1
+                seen_p.add(ident)
+                pidents.append(ident)
             params = []
             if item.kind == "method":
                 params.append("recv: &mut serde_json::Value")
-            for p in item.signature.params:
-                if p.kind in ("receiver", "kwvariadic"):
-                    continue
-                params.append(f"{_ident(p.name)}: {rust_type(p.norm_type)}")
+            for p, ident in zip(sig_params, pidents, strict=True):
+                params.append(f"{ident}: {rust_type(p.norm_type)}")
             ret = item.signature.returns_norm
             ret_s = "" if ret == "unit" else f" -> {rust_type(ret)}"
             out.append(f"{indent}pub fn {name}({', '.join(params)}){ret_s} {{")
@@ -203,15 +219,10 @@ class RustBackend(GeneratorBackend):
                 # '__ctx') must never shadow it — see issue #1
                 out.append(f"{indent}    Box::new(move |__ctx: &mut crate::Ctx| {{")
                 call_args = []
-                for p in item.signature.params:
-                    if p.kind in ("receiver", "kwvariadic"):
-                        continue
+                for p, var in zip(sig_params, pidents, strict=True):
                     ctx_ref = item.ctx_adapter.param_map.get(p.name, f"ctx.{p.name}")
                     key = ctx_ref.removeprefix("ctx.")
                     field = _ident(key)
-                    var = _ident(p.name)
-                    if var == "__ctx":
-                        var = "__ctx_p"
                     if key in item.ctx_adapter.requires:
                         out.append(
                             f"{indent}        let {var} = __ctx.{field}.clone()"

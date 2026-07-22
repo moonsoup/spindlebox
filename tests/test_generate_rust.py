@@ -130,3 +130,12 @@ def test_mod_seg_prelude_and_collisions():
     assert a != b
     # deterministic
     assert _mod_seg("&mut T") == a
+
+
+def test_param_list_identifiers_unique(files):
+    """Two blank params ('_','_') must not both become 'blank' (serde_json #7, E0415)."""
+    import re
+    lib = files["src/lib.rs"]
+    for m in re.finditer(r"pub fn \w+\(([^)]*)\)", lib):
+        names = [p.split(":")[0].strip() for p in m.group(1).split(",") if ":" in p]
+        assert len(names) == len(set(names)), f"duplicate param name in: {m.group(0)}"

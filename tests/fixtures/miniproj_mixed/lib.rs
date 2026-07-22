@@ -41,3 +41,7 @@ pub fn make_adder(n: i64) -> impl Fn(i64) -> i64 {
 pub fn blanked(_: i64, real: i64) -> i64 {
     real
 }
+
+pub fn two_blanks(_: i64, _: bool) -> i64 {
+    0
+}
