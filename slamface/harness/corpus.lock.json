@@ -30,6 +30,17 @@
         {"name": "miniproj_bash", "path": "{app}/tests/fixtures/miniproj_bash", "lang": "bash", "expect_validate": "clean"},
         {"name": "miniproj_mixed", "path": "{app}/tests/fixtures/miniproj_mixed", "lang": "multi", "expect_validate": "clean"}
       ]
+    },
+    "1": {
+      "threshold": 90,
+      "weights_profile": "default",
+      "targets": [
+        {"name": "itsdangerous", "url": "https://github.com/pallets/itsdangerous", "commit": "629bedb84ee95758388dda140cc740f12b52d4d5", "lang": "python", "expect_validate": "any"},
+        {"name": "p-limit", "url": "https://github.com/sindresorhus/p-limit", "commit": "f53bdb5f464ae112b2859e834fdebedc0745199b", "lang": "typescript", "expect_validate": "any"},
+        {"name": "memchr", "url": "https://github.com/BurntSushi/memchr", "commit": "8ad339524d857a2dd9e7231b497ed92aa0f5c334", "lang": "rust", "expect_validate": "any"},
+        {"name": "cobra", "url": "https://github.com/spf13/cobra", "commit": "e94f6d0dd9a5e5738dca6bce03c4b1207ffbc0ec", "lang": "go", "expect_validate": "any"},
+        {"name": "bats-core", "url": "https://github.com/bats-core/bats-core", "commit": "5da66876b8b619235aee1eb3e54954eaca88059b", "lang": "bash", "expect_validate": "any"}
+      ]
     }
   }
 }
