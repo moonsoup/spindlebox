@@ -158,9 +158,11 @@ def run_target(target: dict, corpus_dir: Path, app_root: Path, scratch: Path) ->
         "show_smoke", spindlebox_cmd("show", "0-5"), repo_dir, lang))
 
     gen_dir = scratch / f"gen_{target['name']}"
-    # standalone repro chain with stable paths (scratch dirs are ephemeral)
-    regen = (f"cd {repo_dir} && python3 -m spindlebox generate --lang rust "
-             f"--out /tmp/repro_{target['name']}")
+    # standalone repro chain with stable paths (scratch dirs are ephemeral).
+    # Re-index first so index-time fixes (normalization, sig classes) are actually
+    # exercised — generating against a stale .spi would test the old index.
+    regen = (f"cd {repo_dir} && python3 -m spindlebox index . --no-register >/dev/null && "
+             f"python3 -m spindlebox generate --lang rust --out /tmp/repro_{target['name']}")
     gen_rec = run_stage(
         "generate_rust", spindlebox_cmd("generate", "--lang", "rust", "--out", str(gen_dir)),
         repo_dir, lang, repro_cmd=regen)
