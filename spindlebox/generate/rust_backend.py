@@ -220,6 +220,13 @@ class RustBackend(GeneratorBackend):
                 out.append(f"{indent}    Box::new(move |__ctx: &mut crate::Ctx| {{")
                 call_args = []
                 for p, var in zip(sig_params, pidents, strict=True):
+                    # blank/ignored params ('_') collapse in the name-keyed param_map,
+                    # so routing them through ctx picks the wrong field/type
+                    # (serde_json #7, E0308). They are ignored by definition → pass a
+                    # default, no ctx binding.
+                    if p.name == "_" or set(p.name) <= {"_"}:
+                        call_args.append("Default::default()")
+                        continue
                     ctx_ref = item.ctx_adapter.param_map.get(p.name, f"ctx.{p.name}")
                     key = ctx_ref.removeprefix("ctx.")
                     field = _ident(key)
