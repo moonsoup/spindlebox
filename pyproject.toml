@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "findexer"
+version = "0.1.0"
+description = "Serialized Code Architecture indexer: empirical function index, dependency map, and skeleton generator for any codebase."
+requires-python = ">=3.11"
+dependencies = [
+    "tree-sitter==0.26.0",
+    "tree-sitter-python==0.25.0",
+    "tree-sitter-javascript==0.25.0",
+    "tree-sitter-typescript==0.23.2",
+    "tree-sitter-go==0.25.0",
+    "tree-sitter-rust==0.24.2",
+    "tree-sitter-bash==0.25.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.4"]
+
+[project.scripts]
+findexer = "findexer.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["findexer*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["tests/fixtures"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]
