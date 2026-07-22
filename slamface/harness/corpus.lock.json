@@ -51,6 +51,16 @@
         {"name": "serde_json", "url": "https://github.com/serde-rs/json", "commit": "0ae247ca63be75e6c7e6e0e9cd8916e618cf8f24", "lang": "rust", "expect_validate": "any", "probes": true},
         {"name": "flask", "url": "https://github.com/pallets/flask", "commit": "c12a5d874c5a014495eb2db8a73f40037bc813ac", "lang": "python", "expect_validate": "any", "probes": true}
       ]
+    },
+    "3": {
+      "threshold": 90,
+      "weights_profile": "default",
+      "targets": [
+        {"name": "fastapi", "url": "https://github.com/tiangolo/fastapi", "commit": "1c3e6918750ccb3f20ea260e9a4238ce2c0e5f63", "lang": "python", "expect_validate": "any", "probes": true},
+        {"name": "pydantic", "url": "https://github.com/pydantic/pydantic", "commit": "26129479a06960af9d02d3a948e51985fe59ed4b", "lang": "python", "expect_validate": "any", "probes": true},
+        {"name": "zod", "url": "https://github.com/colinhacks/zod", "commit": "ca42965df46b2f7e2747db29c40a26bcb32a51d5", "lang": "typescript", "expect_validate": "any", "probes": true},
+        {"name": "gin", "url": "https://github.com/gin-gonic/gin", "commit": "75ccf94d605a05fe24817fc2f166f6f2959d5cea", "lang": "go", "expect_validate": "any", "probes": true}
+      ]
     }
   }
 }
