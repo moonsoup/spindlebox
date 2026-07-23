@@ -1,0 +1,13 @@
+{
+  "report": "score-history",
+  "description": "Every slamface run ever scored",
+  "stages": [
+    "collect.score_history",
+    "render.table"
+  ],
+  "ctx": {
+    "project": null,
+    "state_dir": "slamface/.local/state"
+  },
+  "default_format": "md"
+}

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spindlebox"
-version = "0.9.0"
+version = "0.10.0"
 description = "SPIndlebox: the SPIndleframe architecture indexer - empirical Serialized Process Index (SPI), dependency map, and skeleton generator for any codebase."
 requires-python = ">=3.11"
 dependencies = [
@@ -29,7 +29,8 @@ findexer = "spindlebox.cli:main"  # legacy alias, kept forever
 include = ["spindlebox*"]
 
 [tool.setuptools.package-data]
-spindlebox = ["extract/profiles/*.json"]
+spindlebox = ["extract/profiles/*.json", "generate/emit_profiles/*.json",
+              "reporting_stacks/*.stack.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "slamface/tests"]

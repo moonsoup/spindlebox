@@ -349,6 +349,37 @@ def cmd_generate(args) -> int:
     return 0
 
 
+def cmd_report(args) -> int:
+    from spindlebox import reporting
+    stacks = reporting.list_stacks()
+    if args.list or not args.name:
+        for name, stack in stacks.items():
+            errs = reporting.check_stack(stack)
+            state = "ok" if not errs else f"INVALID: {errs[0]}"
+            print(f"{name:20s} {stack.get('description', ''):55s} [{state}]")
+        return 0
+    stack = stacks.get(args.name)
+    if stack is None:
+        raise CliError(f"no report '{args.name}' (have: {', '.join(stacks)})")
+    if args.check:
+        errs = reporting.check_stack(stack)
+        for e in errs:
+            print(f"error: {e}")
+        return 1 if errs else 0
+    overrides = json.loads(args.ctx) if args.ctx else {}
+    if args.project:
+        overrides["project"] = args.project
+    if args.format:
+        overrides["format"] = args.format
+    ctx = reporting.run_stack(stack, overrides)
+    if args.out:
+        Path(args.out).write_text(ctx["output"])
+        print(f"wrote {args.out}")
+    else:
+        print(ctx["output"], end="")
+    return 0
+
+
 def cmd_gaps(args) -> int:
     from spindlebox.gaps import find_gaps
     idx, _root = _load_project(args)
@@ -469,6 +500,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--group", help="restrict to one group path")
     _add_project_arg(p)
     p.set_defaults(func=cmd_generate)
+
+    p = sub.add_parser("report", help="run a SPIndlestack report (list with --list)")
+    p.add_argument("name", nargs="?", help="report name (omit to list)")
+    p.add_argument("--list", action="store_true", help="list available reports")
+    p.add_argument("--check", action="store_true", help="validate the stack, don't run")
+    p.add_argument("--format", choices=["md", "csv", "html", "json"])
+    p.add_argument("--project", help="restrict to one registered project")
+    p.add_argument("--ctx", help="JSON ctx overrides")
+    p.add_argument("--out", help="write output to a file instead of stdout")
+    p.set_defaults(func=cmd_report)
 
     p = sub.add_parser("pipeline", help="define/check/list ordered pipelines")
     pipe_sub = p.add_subparsers(dest="pipe_cmd", required=True)

@@ -1,0 +1,7 @@
+{
+  "report": "typing-health",
+  "description": "Where untyped code hides",
+  "stages": ["collect.typing_health", "render.table"],
+  "ctx": {"project": null},
+  "default_format": "md"
+}

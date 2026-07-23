@@ -57,6 +57,8 @@ spindlebox deps src.utils.io.read_lines
 spindlebox validate --strict
 spindlebox call pure.add --ctx '{"a": 2, "b": 40}'
 spindlebox generate --lang rust --out /tmp/port
+spindlebox report                       # list reports; see docs/REPORTING.md
+spindlebox report typing-health --format csv
 ```
 
 ## Compatibility

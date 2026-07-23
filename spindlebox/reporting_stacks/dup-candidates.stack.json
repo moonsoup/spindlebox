@@ -1,0 +1,7 @@
+{
+  "report": "dup-candidates",
+  "description": "What you have already written twice",
+  "stages": ["collect.dup_candidates", "render.table"],
+  "ctx": {"project": null},
+  "default_format": "md"
+}

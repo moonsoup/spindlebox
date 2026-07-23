@@ -1,0 +1,7 @@
+{
+  "report": "compile-matrix",
+  "description": "Which projects generate into which languages",
+  "stages": ["collect.compile_matrix", "render.table"],
+  "ctx": {"project": null},
+  "default_format": "md"
+}
