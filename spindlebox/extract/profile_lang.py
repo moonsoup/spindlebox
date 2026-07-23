@@ -46,7 +46,11 @@ class ProfileWalker:
         self.boundaries = set(profile.boundaries)
         self.decls: list[RawDecl] = []
         grammar = profile.grammar or {}
-        self.tree = parse(grammar.get("name", profile.language), source)
+        gname = grammar.get("name", profile.language)
+        for suffix, alt in grammar.get("by_suffix", {}).items():
+            if rel_path.endswith(suffix):
+                gname = alt
+        self.tree = parse(gname, source)
         self.root = self.tree.root_node
         self.imports = self._collect_imports()
         pattern = profile.calls.get("pattern")
@@ -78,6 +82,8 @@ class ProfileWalker:
 
     def _params(self, node) -> list[RawParam]:
         spec = self.p.params
+        if "hook" in spec:
+            return HOOKS[spec["hook"]](self, node)
         plist = node.child_by_field_name(spec.get("field", "parameters"))
         if plist is None:
             return []
@@ -99,11 +105,15 @@ class ProfileWalker:
             kind = rule.get("kind", "positional")
             if rule.get("type_from") == "first_named_child":
                 tp = text(pd.named_children[0]) if pd.named_children else None
+            elif rule.get("type_from_text"):
+                tp = text(pd)
             else:
                 tp = text(pd.child_by_field_name(rule["type_field"])) or None \
                     if "type_field" in rule else None
             names: list[str] = []
-            if "name_field" in rule:
+            if "name_literal" in rule:
+                names = [rule["name_literal"]]
+            elif "name_field" in rule:
                 nm = pd.child_by_field_name(rule["name_field"])
                 if nm is not None:
                     names = [text(nm)]
@@ -148,10 +158,15 @@ class ProfileWalker:
                             names.add(text(nm))
             elif rule.get("children") == "identifier":
                 names.update(text(c) for c in n.children if c.type == "identifier")
+            elif "name_field_direct" in rule:
+                nm = n.child_by_field_name(rule["name_field_direct"])
+                if nm is not None:
+                    names.add(text(nm))
             elif "field" in rule:
                 target = n.child_by_field_name(rule["field"])
                 if target is not None:
-                    names.update(text(x) for x in walk(target) if x.type == "identifier")
+                    ident_types = set(rule.get("ident_types", ["identifier"]))
+                    names.update(text(x) for x in walk(target) if x.type in ident_types)
         return names
 
     def _writes(self, node) -> set[str]:
@@ -168,7 +183,13 @@ class ProfileWalker:
                 elif left.type == "identifier":
                     targets.add(text(left))
             elif n.type in spec.get("update", ()):
-                targets.update(text(x) for x in walk(n) if x.type == "identifier")
+                update_field = spec.get("update_field")
+                if update_field:
+                    arg = n.child_by_field_name(update_field)
+                    if arg is not None and arg.type == "identifier":
+                        targets.add(text(arg))
+                else:
+                    targets.update(text(x) for x in walk(n) if x.type == "identifier")
         return targets
 
     def _reads(self, node) -> set[str]:
@@ -217,25 +238,29 @@ class ProfileWalker:
                 name = n.child_by_field_name(spec["compose"]["name"])
                 if name is None:
                     continue
-                t = (text(obj) + "." if obj is not None else "") + text(name)
+                raw = (text(obj) + "." if obj is not None else "") + text(name)
             else:
                 fn = n.child_by_field_name(spec.get("field", "function"))
                 if fn is None:
                     continue
-                t = text(fn)
+                raw = text(fn)
+            if spec.get("known_only") and raw not in self.known_fn_names:
+                continue
+            if self.call_re is not None and not self.call_re.match(raw):
+                continue
+            t = raw
             for old, new in spec.get("replace", {}).items():
                 t = t.replace(old, new)
-            if spec.get("known_only") and t not in self.known_fn_names:
-                continue
-            if self.call_re is not None and not self.call_re.match(t):
-                continue
-            if t not in calls:
+            # membership tested on the raw spelling, matching the legacy extractors
+            if raw not in calls:
                 calls.append(t)
         return calls
 
     # ----------------------------------------------------------------- emit
 
     def _is_async(self, node) -> bool:
+        if self.p.raw.get("is_async_hook"):
+            return HOOKS[self.p.raw["is_async_hook"]](self, node)
         spec = self.p.raw.get("is_async")
         if not spec:
             return False
@@ -244,6 +269,10 @@ class ProfileWalker:
     def emit(self, node, name, kind, scope, classes, params, state,
              returns_raw=None, returns_norm=None) -> None:
         doc_types = self.p.doc.get("types")
+        if self.p.doc.get("hook"):
+            raw_doc = HOOKS[self.p.doc["hook"]](self, node)
+        else:
+            raw_doc = preceding_doc(node, set(doc_types) if doc_types else None)
         self.decls.append(RawDecl(
             name=name,
             kind=kind,
@@ -257,10 +286,7 @@ class ProfileWalker:
             returns_raw=returns_raw,
             returns_norm=returns_norm,
             is_async=self._is_async(node),
-            doc=_clean_doc(
-                preceding_doc(node, set(doc_types) if doc_types else None),
-                self.p.doc.get("clean"),
-            ),
+            doc=_clean_doc(raw_doc, self.p.doc.get("clean")),
             body_text=text(node),
             calls=self._calls(node),
             imports=list(self.imports),
@@ -273,7 +299,9 @@ class ProfileWalker:
         if self.p.mode == "flat":
             self._run_flat()
         else:
-            self._visit(self.root, [], [], set(), False)
+            init_hook = self.p.raw.get("init_declared_hook")
+            seed = HOOKS[init_hook](self) if init_hook else set()
+            self._visit(self.root, [], [], seed, False)
         return self.decls
 
     def _run_flat(self) -> None:
@@ -297,8 +325,15 @@ class ProfileWalker:
             spec = self.p.declarations.get(t)
             if container is not None:
                 cname = text(child.child_by_field_name(container.get("name_field", "name")))
+                if container.get("name_strip_generics"):
+                    cname = cname.split("<")[0].strip()
+                if not cname:
+                    cname = container.get("name_missing", cname)
                 new_classes = [*classes, cname] if container.get("role") == "class" else classes
-                self._visit(child, [*scope, cname], new_classes, anc_declared, in_func)
+                new_scope = scope if (
+                    container.get("scope_skip_duplicate") and cname in scope
+                ) else [*scope, cname]
+                self._visit(child, new_scope, new_classes, anc_declared, in_func)
             elif spec is not None:
                 self._handle(child, spec, scope, classes, anc_declared, in_func)
             else:
@@ -428,3 +463,230 @@ def _bash_source_imports(walker: ProfileWalker) -> list[str]:
                 if args:
                     imports.append(text(args[-1]).strip("'\""))
     return imports
+
+
+# ---- rust hooks (mirror rust_lang.py: self receiver, move closures, async) ----
+
+def _rust_self_state(walker: ProfileWalker, node, self_kind: str) -> str:
+    body = node.child_by_field_name("body")
+    if body is not None:
+        for n in walk_own(body, walker.boundaries):
+            if n.type in ("assignment_expression", "compound_assignment_expr"):
+                left = n.child_by_field_name("left")
+                if left is not None and text(left).startswith("self."):
+                    return "mutates_instance"
+    if "&mut" in self_kind:
+        return "mutates_instance"
+    if self_kind.strip() == "self":
+        return "consumes"
+    return "reads_instance"
+
+
+@hook("rust_is_async")
+def _rust_is_async(walker: ProfileWalker, node) -> bool:
+    return any(c.type == "async" or text(c) == "async" for c in node.children
+               if not c.is_named or c.type == "function_modifiers")
+
+
+@hook("rust_function_item")
+def _rust_function_item(walker, node, spec, scope, classes, anc_declared, in_func):
+    name = text(node.child_by_field_name("name"))
+    params = walker._params(node)
+    self_kind = next((q.raw_type for q in params if q.kind == "receiver"), None)
+    rt = node.child_by_field_name("return_type")
+    if self_kind is not None:
+        kind, state = "method", _rust_self_state(walker, node, self_kind)
+    elif in_func:
+        kind, state = "closure", "pure"
+    else:
+        kind, state = ("method", "pure") if classes else ("function", "pure")
+    walker.emit(node, name, kind, scope, classes, params, state,
+                returns_raw=text(rt) if rt is not None else None)
+    walker._visit(node, [*scope, name], classes,
+                  anc_declared | walker._declared(node), True)
+
+
+@hook("rust_closure")
+def _rust_closure(walker, node, spec, scope, classes, anc_declared, in_func):
+    own = walker._declared(node)
+    writes = {w for w in walker._writes(node) if w not in own and w in anc_declared}
+    reads = {r for r in walker._reads(node) if r not in own and r in anc_declared}
+    moved = any(text(c) == "move" for c in node.children if not c.is_named)
+    if writes:
+        state = "mutates_captured"
+    elif moved:
+        state = "consumes"
+    elif reads:
+        state = "reads_captured"
+    else:
+        state = "pure"
+    walker.emit(node, "<closure>", "closure", scope, classes,
+                walker._params(node), state, returns_raw=None)
+    walker._visit(node, scope, classes, anc_declared | own, True)
+
+
+# ---- js/ts hooks (mirror js_lang.py: name inference, destructuring, doc hops) ----
+
+_JS_FUNC_TYPES = {
+    "function_declaration", "generator_function_declaration", "function_expression",
+    "generator_function", "arrow_function", "method_definition",
+}
+_JS_CLASS_TYPES = {"class_declaration", "class"}
+_JS_CALL_RE = re.compile(r"^[A-Za-z_$][\w$]*(\.[\w$]+)*$")
+
+
+@hook("js_imports")
+def _js_imports(walker: ProfileWalker) -> list[str]:
+    imports = []
+    for n in walk(walker.root):
+        if n.type == "import_statement":
+            src = n.child_by_field_name("source")
+            if src is not None:
+                imports.append(text(src).strip("'\""))
+        elif n.type == "call_expression":
+            fn = n.child_by_field_name("function")
+            if fn is not None and text(fn) == "require":
+                args = n.child_by_field_name("arguments")
+                if args is not None and args.named_children:
+                    imports.append(text(args.named_children[0]).strip("'\""))
+    return imports
+
+
+@hook("js_module_declared")
+def _js_module_declared(walker: ProfileWalker) -> set[str]:
+    return {
+        text(n.child_by_field_name("name") or n)
+        for n in walk_own(walker.root, _JS_FUNC_TYPES | _JS_CLASS_TYPES)
+        if n.type == "variable_declarator"
+    }
+
+
+@hook("js_params")
+def _js_params(walker: ProfileWalker, func_node) -> list[RawParam]:
+    plist = func_node.child_by_field_name("parameters")
+    if plist is None:
+        single = func_node.child_by_field_name("parameter")
+        if single is not None:
+            return [RawParam(name=text(single))]
+        return []
+    out: list[RawParam] = []
+    for i, node in enumerate(plist.named_children):
+        t = node.type
+        raw_type = None
+        default = None
+        kind = "positional"
+        target = node
+        if t in ("required_parameter", "optional_parameter"):
+            tp = node.child_by_field_name("type")
+            if tp is not None:
+                raw_type = text(tp).lstrip(":").strip()
+            val = node.child_by_field_name("value")
+            if val is not None:
+                default = text(val)
+            target = node.child_by_field_name("pattern") or node
+            t = target.type
+        if t == "assignment_pattern":
+            left = target.child_by_field_name("left")
+            default = text(target.child_by_field_name("right"))
+            target = left if left is not None else target
+            t = target.type if target is not None else "identifier"
+        if t == "rest_pattern":
+            kind = "variadic"
+            idents = [c for c in walk(target) if c.type == "identifier"]
+            name = text(idents[0]) if idents else f"arg{i}"
+        elif t == "identifier":
+            name = text(target)
+        elif t == "this":
+            name = "this"
+            kind = "receiver"
+        else:  # object/array destructuring
+            name = f"arg{i}"
+        out.append(RawParam(name=name, raw_type=raw_type, default=default, kind=kind))
+    return out
+
+
+@hook("js_doc")
+def _js_doc(walker: ProfileWalker, node) -> str | None:
+    doc = preceding_doc(node)
+    if doc:
+        return doc
+    p = node.parent
+    hops = 0
+    while p is not None and hops < 4:
+        if p.type in ("lexical_declaration", "variable_declaration", "export_statement",
+                      "expression_statement"):
+            return preceding_doc(p)
+        p = p.parent
+        hops += 1
+    return None
+
+
+def _js_name_for(node) -> str | None:
+    nm = node.child_by_field_name("name")
+    if nm is not None:
+        return text(nm)
+    parent = node.parent
+    if parent is not None:
+        if parent.type == "variable_declarator":
+            pn = parent.child_by_field_name("name")
+            if pn is not None and pn.type == "identifier":
+                return text(pn)
+        elif parent.type == "pair":
+            return text(parent.child_by_field_name("key"))
+        elif parent.type == "assignment_expression":
+            left = text(parent.child_by_field_name("left"))
+            if _JS_CALL_RE.match(left):
+                return left.rsplit(".", 1)[-1]
+    return None
+
+
+def _js_this_capture(walker: ProfileWalker, node) -> str:
+    body = node.child_by_field_name("body") or node
+    reads = False
+    for n in walk_own(body, _JS_FUNC_TYPES):
+        if n.type in ("assignment_expression", "augmented_assignment_expression"):
+            left = n.child_by_field_name("left")
+            if left is not None and text(left).startswith("this."):
+                return "mutates_instance"
+        elif n.type == "update_expression":
+            arg = n.child_by_field_name("argument")
+            if arg is not None and text(arg).startswith("this."):
+                return "mutates_instance"
+        elif n.type == "this":
+            reads = True
+    return "reads_instance" if reads else "pure"
+
+
+@hook("js_function")
+def _js_function(walker, node, spec, scope, classes, anc_declared, in_func):
+    name = _js_name_for(node)
+    anonymous = name is None
+    if node.type == "method_definition" and classes:
+        kind = "method"
+    elif anonymous:
+        kind = "lambda" if node.type == "arrow_function" else "closure"
+    elif in_func:
+        kind = "closure"
+    else:
+        kind = "function"
+    name = name or "<anonymous>"
+
+    if kind == "method":
+        state = _js_this_capture(walker, node)
+    else:
+        own = walker._declared(node)
+        writes = {w for w in walker._writes(node) if w not in own and w in anc_declared}
+        reads = {r for r in walker._reads(node) if r not in own and r in anc_declared}
+        if writes:
+            state = "mutates_captured"
+        elif reads and (in_func or kind in ("closure", "lambda")):
+            state = "reads_captured"
+        else:
+            state = "pure"
+
+    rt = node.child_by_field_name("return_type")
+    walker.emit(node, name, kind, scope, classes, walker._params(node), state,
+                returns_raw=text(rt).lstrip(":").strip() if rt is not None else None)
+    walker._visit(node,
+                  [*scope, name if not anonymous else f"anon{node.start_point[0] + 1}"],
+                  classes, anc_declared | walker._declared(node), True)

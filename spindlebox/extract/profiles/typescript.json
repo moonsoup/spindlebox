@@ -1,0 +1,111 @@
+{
+  "language": "typescript",
+  "extensions": [
+    ".ts",
+    ".tsx"
+  ],
+  "grammar": {
+    "module": "tree_sitter_typescript",
+    "attr": "language_typescript",
+    "name": "typescript",
+    "by_suffix": {
+      ".tsx": "tsx"
+    }
+  },
+  "walker": true,
+  "mode": "nested",
+  "boundaries": [
+    "function_declaration",
+    "generator_function_declaration",
+    "function_expression",
+    "generator_function",
+    "arrow_function",
+    "method_definition"
+  ],
+  "imports_hook": "js_imports",
+  "init_declared_hook": "js_module_declared",
+  "calls": {
+    "node": "call_expression",
+    "field": "function",
+    "pattern": "^[A-Za-z_$][\\w$]*(\\.[\\w$]+)*$",
+    "boundaries": [
+      "function_declaration",
+      "generator_function_declaration",
+      "function_expression",
+      "generator_function",
+      "arrow_function",
+      "method_definition"
+    ]
+  },
+  "doc": {
+    "hook": "js_doc"
+  },
+  "declare": {
+    "param_fields": [
+      "parameters",
+      "parameter"
+    ],
+    "nodes": {
+      "variable_declarator": {
+        "field": "name",
+        "ident_types": [
+          "identifier",
+          "shorthand_property_identifier_pattern"
+        ]
+      },
+      "function_declaration": {
+        "name_field_direct": "name"
+      }
+    }
+  },
+  "writes": {
+    "assign": [
+      "assignment_expression",
+      "augmented_assignment_expression"
+    ],
+    "assign_field": "left",
+    "assign_idents": "single",
+    "update": [
+      "update_expression"
+    ],
+    "update_field": "argument"
+  },
+  "params": {
+    "hook": "js_params"
+  },
+  "containers": {
+    "class_declaration": {
+      "role": "class",
+      "name_field": "name",
+      "name_missing": "<class>"
+    },
+    "class": {
+      "role": "class",
+      "name_field": "name",
+      "name_missing": "<class>"
+    }
+  },
+  "declarations": {
+    "function_declaration": {
+      "handler": "js_function"
+    },
+    "generator_function_declaration": {
+      "handler": "js_function"
+    },
+    "function_expression": {
+      "handler": "js_function"
+    },
+    "generator_function": {
+      "handler": "js_function"
+    },
+    "arrow_function": {
+      "handler": "js_function"
+    },
+    "method_definition": {
+      "handler": "js_function"
+    }
+  },
+  "is_async": {
+    "child_type": "async"
+  }
+}

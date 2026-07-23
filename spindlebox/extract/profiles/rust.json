@@ -1,0 +1,49 @@
+{
+  "language": "rust",
+  "extensions": [".rs"],
+  "grammar": {"module": "tree_sitter_rust", "attr": "language", "name": "rust"},
+  "walker": true,
+  "mode": "nested",
+  "boundaries": ["function_item", "closure_expression"],
+  "imports": [{"node": "use_declaration", "field": "argument"}],
+  "calls": {
+    "node": "call_expression",
+    "field": "function",
+    "pattern": "^[A-Za-z_][\\w:]*(\\.[\\w]+)*$",
+    "boundaries": ["closure_expression"],
+    "replace": {"::": "."}
+  },
+  "doc": {"types": ["line_comment", "block_comment"]},
+  "declare": {
+    "param_fields": ["parameters"],
+    "nodes": {
+      "let_declaration": {"field": "pattern"}
+    }
+  },
+  "writes": {
+    "assign": ["assignment_expression", "compound_assignment_expr"],
+    "assign_field": "left",
+    "assign_idents": "single"
+  },
+  "params": {
+    "field": "parameters",
+    "nodes": {
+      "self_parameter": {"name_literal": "self", "type_from_text": true, "kind": "receiver"},
+      "parameter": {"type_field": "type", "name_field": "pattern", "fallback": "arg{i}"},
+      "identifier": {"bare_text": true}
+    }
+  },
+  "containers": {
+    "impl_item": {
+      "role": "class", "name_field": "type",
+      "name_strip_generics": true, "name_missing": "<impl>",
+      "scope_skip_duplicate": true
+    },
+    "mod_item": {"role": "module", "name_field": "name"}
+  },
+  "declarations": {
+    "function_item": {"handler": "rust_function_item"},
+    "closure_expression": {"handler": "rust_closure"}
+  },
+  "is_async_hook": "rust_is_async"
+}
