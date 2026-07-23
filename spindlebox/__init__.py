@@ -1,6 +1,6 @@
 """SPIndlebox — the SPIndleframe architecture indexer (Serialized Process Index)."""
 
-__version__ = "0.10.0"
+__version__ = "1.0.0"
 
 SPI_VERSION = "1.0"
 SCA_VERSION = SPI_VERSION  # legacy alias (pre-rebrand name); do not remove

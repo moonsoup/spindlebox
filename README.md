@@ -1,5 +1,8 @@
 # SPIndlebox
 
+**Live status:** [moonsoup.github.io/spindlebox](https://moonsoup.github.io/spindlebox/) ·
+MIT licensed · [sponsor](https://github.com/sponsors/moonsoup)
+
 **The SPIndleframe indexer.** SPIndlebox empirically decomposes any codebase — Python,
 JavaScript/TypeScript, Go, Rust, Bash, Java — into an **SPI (Serialized Process Index)**: a
 nested, addressable, data-driven index of every function, so that:
