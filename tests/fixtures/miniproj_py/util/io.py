@@ -1,7 +1,10 @@
 import json
 import os
 
-import requests  # noqa: F401  (external dep on purpose)
+try:
+    import requests  # noqa: F401  (external dep on purpose — dep extraction sees it)
+except ImportError:  # dispatch imports this module; it must load in minimal envs
+    requests = None
 
 
 def read_lines(path: str) -> list[str]:
