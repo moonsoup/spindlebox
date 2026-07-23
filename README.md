@@ -64,6 +64,16 @@ spindlebox report                       # list reports; see docs/REPORTING.md
 spindlebox report typing-health --format csv
 ```
 
+## Where things land
+
+| Command | Output | Where |
+|---|---|---|
+| `index <path>` | the SPI | `<path>/.spi/index.json` — a **hidden** folder (`ls -a`; in Finder `Cmd+Shift+.`), plus an entry in the registry |
+| `generate --lang X` | skeleton source | `./generated_X/` in your current directory, or `--out <dir>` |
+| `report <name>` | the report | **stdout only** — pass `--out <file>` (or redirect) to get a file |
+| `search` / `show` / `deps` / `validate` / `call` | text | stdout |
+| (all commands) | project registry | `~/.spindlebox/registry.json` |
+
 ## Compatibility
 
 - Legacy `.sca/index.json` indexes (pre-rebrand) load transparently; new indexes write to
