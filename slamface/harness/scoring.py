@@ -10,7 +10,7 @@ from __future__ import annotations
 _CRITERIA_STAGES = {
     "index_success": ("index",),
     "validate_expected": ("validate",),
-    "generate_compiles": ("cargo_check",),
+    "generate_compiles": ("cargo_check", "javac_check"),
     "dispatch_roundtrip": ("dispatch",),
     "aux_probes": ("gaps_probe", "workflows_probe"),
 }

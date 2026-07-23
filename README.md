@@ -68,7 +68,16 @@ spindlebox generate --lang rust --out /tmp/port
 
 ## Adding a language
 
-Input languages are defined by **declarative profiles** (`spindlebox/extract/profiles/*.json`):
+Both directions are declarative — any indexed language can be regenerated into any
+output language (e.g. Go in, Java out): `spindlebox generate --lang java`.
+
+**Output languages** are defined by **emit profiles** (`spindlebox/generate/emit_profiles/*.json`):
+identifier/keyword rules, a core-1 → target type table, and code-line templates, consumed
+by a generic emit engine (`generate/profile_backend.py`). Rust's emit profile is held
+byte-identical to the legacy hand-written backend by differential test; Java output exists
+only as a profile and is `javac`-checked in CI and by the slamface harness.
+
+**Input languages** are defined by **extraction profiles** (`spindlebox/extract/profiles/*.json`):
 file extensions, tree-sitter grammar wheel, node-role tables, capture-analysis rules, a
 core-1 type table, and env-var/import patterns. A generic walker (`extract/profile_lang.py`)
 consumes the profile; the handful of genuinely language-specific behaviors live in a shared,

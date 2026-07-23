@@ -187,6 +187,28 @@ def run_target(target: dict, corpus_dir: Path, app_root: Path, scratch: Path) ->
                             "duration_ms": 0, "exit_code": None,
                             "detail": "cargo not installed"})
 
+    jgen_dir = scratch / f"jgen_{target['name']}"
+    jregen = (f"cd {repo_dir} && python3 -m spindlebox index . --no-register >/dev/null && "
+              f"python3 -m spindlebox generate --lang java --out /tmp/jrepro_{target['name']}")
+    jgen_rec = run_stage(
+        "generate_java", spindlebox_cmd("generate", "--lang", "java", "--out", str(jgen_dir)),
+        repo_dir, lang, repro_cmd=jregen)
+    records.append(jgen_rec)
+
+    if jgen_rec["status"] == "ok":
+        java_files = sorted(f.name for f in jgen_dir.glob("*.java"))
+        if shutil.which("javac") and java_files:
+            records.append(run_stage(
+                "javac_check",
+                ["javac", "-encoding", "UTF-8", "-d", str(jgen_dir / "out"), *java_files],
+                jgen_dir, lang, timeout=900,
+                repro_cmd=(f"{jregen} && cd /tmp/jrepro_{target['name']} && "
+                           f"javac -encoding UTF-8 -d out *.java")))
+        else:
+            records.append({"stage": "javac_check", "lang": lang, "status": "skip",
+                            "duration_ms": 0, "exit_code": None,
+                            "detail": "javac not installed" if java_files else "no .java output"})
+
     if target.get("probes"):
         for probe, args in (("gaps_probe", ["gaps", "--json"]),
                             ("workflows_probe", ["workflows", "--json"])):
