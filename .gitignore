@@ -11,3 +11,4 @@ build/
 slamface/.env
 slamface/.local/
 slamface/.env.ops
+slamface/

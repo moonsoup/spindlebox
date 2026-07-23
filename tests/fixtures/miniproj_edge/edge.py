@@ -1,4 +1,4 @@
-"""Edge-case corpus distilled from slamface findings (#11 flask, #12 click)."""
+"""Edge-case corpus distilled from harness findings (#11 flask, #12 click)."""
 
 
 def process(result: str) -> str:

@@ -80,7 +80,7 @@ output language (e.g. Go in, Java out): `spindlebox generate --lang java`.
 identifier/keyword rules, a core-1 → target type table, and code-line templates, consumed
 by a generic emit engine (`generate/profile_backend.py`). Rust's emit profile is held
 byte-identical to the legacy hand-written backend by differential test; Java output exists
-only as a profile and is `javac`-checked in CI and by the slamface harness.
+only as a profile and is `javac`-checked in CI and by a continuous hardening harness.
 
 **Input languages** are defined by **extraction profiles** (`spindlebox/extract/profiles/*.json`):
 file extensions, tree-sitter grammar wheel, node-role tables, capture-analysis rules, a

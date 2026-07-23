@@ -65,14 +65,14 @@ def test_javac_check(project, tmp_path):
 
 
 def test_result_param_binding_disambiguated():
-    """slamface #11 (flask): a source param named 'result' redeclared the
+    """harness finding #11 (flask): a source param named 'result' redeclared the
     wrapper's local in Java (no let-shadowing)."""
     src = gen("miniproj_edge")["Miniproj_edge.java"]
     assert "var result_2 = Miniproj_edge.edge.process(result);" in src
 
 
 def test_object_member_names_escaped():
-    """slamface #12 (click): a static 'clone()' illegally hides Object.clone()."""
+    """harness finding #12 (click): a static 'clone()' illegally hides Object.clone()."""
     src = gen("miniproj_edge")["Miniproj_edge.java"]
     assert "public static String clone_()" in src
     assert "public static String toString_(" in src

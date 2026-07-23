@@ -27,7 +27,7 @@ Formats: `md` (default) · `csv` · `html` · `json`. Every report accepts
 | `typing-health` | Where does code collapse to `any`? Which files hurt migration most? |
 | `dup-candidates` | What has been written more than once, across every indexed repo? |
 | `compile-matrix` | Which projects generate into which output languages? |
-| `score-history` | Every slamface harness run, scored and versioned. |
+| `score-history` | Every hardening-harness run, scored and versioned. |
 
 Reports read the SPI indexes of **registered projects** — run
 `spindlebox index <path>` first; `--project` names one, otherwise all.

@@ -3,103 +3,141 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SPIndlebox status</title>
+<title>SPIndlebox — one index for every codebase you own</title>
 <style>
   :root {
     --bg: #f4f4f1; --surface: #ffffff; --line: #dcdbd4; --line-soft: #e7e6e0;
-    --ink: #23252b; --muted: #6c6b63; --accent: #b05e2e;
+    --ink: #23252b; --muted: #6c6b63; --accent: #b05e2e; --accent-bg: #f6ebe2;
     --t0: #2a78d6; --t1: #eb6834; --t2: #1baf7a; --t3: #eda100;
     --good: #2e7d4f; --good-bg: #e3efe7; --bad: #b6452f; --bad-bg: #f6e6e1;
-    --chip: #eeede8;
+    --chip: #eeede8; --code-bg: #1d2026; --code-ink: #e9e7e2;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #16181d; --surface: #1d2026; --line: #2c3038; --line-soft: #252930;
-      --ink: #e9e7e2; --muted: #9a978e; --accent: #d08355;
+      --ink: #e9e7e2; --muted: #9a978e; --accent: #d08355; --accent-bg: #2c231b;
       --t0: #3987e5; --t1: #d95926; --t2: #199e70; --t3: #c98500;
       --good: #4aa76d; --good-bg: #1d2f24; --bad: #d2604f; --bad-bg: #33211c;
-      --chip: #262a31;
+      --chip: #262a31; --code-bg: #121419; --code-ink: #e9e7e2;
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
     --bg: #16181d; --surface: #1d2026; --line: #2c3038; --line-soft: #252930;
-    --ink: #e9e7e2; --muted: #9a978e; --accent: #d08355;
+    --ink: #e9e7e2; --muted: #9a978e; --accent: #d08355; --accent-bg: #2c231b;
     --t0: #3987e5; --t1: #d95926; --t2: #199e70; --t3: #c98500;
     --good: #4aa76d; --good-bg: #1d2f24; --bad: #d2604f; --bad-bg: #33211c;
-    --chip: #262a31;
+    --chip: #262a31; --code-bg: #121419; --code-ink: #e9e7e2;
     color-scheme: dark;
   }
   :root[data-theme="light"] {
     --bg: #f4f4f1; --surface: #ffffff; --line: #dcdbd4; --line-soft: #e7e6e0;
-    --ink: #23252b; --muted: #6c6b63; --accent: #b05e2e;
+    --ink: #23252b; --muted: #6c6b63; --accent: #b05e2e; --accent-bg: #f6ebe2;
     --t0: #2a78d6; --t1: #eb6834; --t2: #1baf7a; --t3: #eda100;
     --good: #2e7d4f; --good-bg: #e3efe7; --bad: #b6452f; --bad-bg: #f6e6e1;
-    --chip: #eeede8;
+    --chip: #eeede8; --code-bg: #1d2026; --code-ink: #e9e7e2;
     color-scheme: light;
   }
 
   * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif;
-  }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15.5px/1.6 -apple-system, "Segoe UI", system-ui, sans-serif; }
   .mono { font-family: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace; }
-  main { max-width: 1060px; margin: 0 auto; padding: 28px 20px 64px; }
+  main { max-width: 1020px; margin: 0 auto; padding: 34px 20px 70px; }
+  a { color: var(--accent); }
+  h2 { font-size: 21px; letter-spacing: -0.01em; margin: 0 0 6px; text-wrap: balance; }
+  section { margin-top: 58px; }
+  .lede { color: var(--muted); max-width: 62ch; margin: 0 0 18px; }
+  .eyebrow { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.1em;
+             color: var(--accent); font-weight: 700; margin: 0 0 6px; }
 
-  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px;
-           border-bottom: 2px solid var(--ink); padding-bottom: 14px; }
-  header h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
-  header h1 .spin { color: var(--accent); }
-  .headmeta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-left: auto;
-              font-size: 13px; color: var(--muted); align-items: baseline; }
+  /* hero */
+  .hero { padding: 26px 0 8px; }
+  .hero h1 { font-size: clamp(30px, 5.4vw, 46px); line-height: 1.12; margin: 0 0 12px;
+             letter-spacing: -0.025em; text-wrap: balance; max-width: 21ch; }
+  .hero h1 .spin { color: var(--accent); }
+  .hero p.sub { font-size: 17px; color: var(--muted); max-width: 58ch; margin: 0 0 20px; }
+  .hero .links { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+                 font-size: 14px; }
+  .btn { display: inline-block; padding: 7px 16px; border-radius: 6px; font-weight: 600;
+         text-decoration: none; border: 1.5px solid var(--accent); }
+  .btn.solid { background: var(--accent); color: #fff; }
+  .btn.ghost { color: var(--accent); }
   .verdict { display: inline-flex; align-items: center; gap: 7px; font-weight: 600;
-             color: var(--good); background: var(--good-bg);
-             padding: 3px 12px; border-radius: 999px; font-size: 13px; }
+             color: var(--good); background: var(--good-bg); padding: 3px 12px;
+             border-radius: 999px; font-size: 13px; }
   .verdict::before { content: ""; width: 8px; height: 8px; border-radius: 50%;
                      background: var(--good); }
 
-  .eyebrow { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.09em;
-             color: var(--muted); font-weight: 600; margin: 0 0 10px; }
-  section { margin-top: 40px; }
-  section > p.note { color: var(--muted); font-size: 13.5px; margin: 10px 0 0; max-width: 68ch; }
+  /* the demo: five languages, one signature class */
+  .demo { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+          margin-top: 30px; overflow: hidden; }
+  .tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+  .tabs button { font: 600 13px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.02em;
+                 padding: 11px 16px; border: 0; background: none; color: var(--muted);
+                 cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs button[aria-selected="true"] { color: var(--accent);
+                 border-bottom-color: var(--accent); }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .demo pre { margin: 0; padding: 18px 20px; background: var(--code-bg);
+              color: var(--code-ink); overflow-x: auto;
+              font: 13.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .demo .collapse { display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+                    font-size: 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .demo .collapse .arrow { color: var(--muted); }
+  .sigclass { font-family: ui-monospace, Menlo, monospace; font-weight: 700;
+              color: var(--accent); background: var(--accent-bg); padding: 3px 10px;
+              border-radius: 6px; }
+  .kw { color: #8fb573; } .ty { color: #6fb3d2; } .fn { color: #e0b26a; }
 
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-           gap: 10px; margin-top: 18px; }
-  .tile { background: var(--surface); border: 1px solid var(--line);
-          border-radius: 6px; padding: 12px 14px 10px; }
-  .tile .v { font-size: 26px; font-weight: 650; letter-spacing: -0.01em;
-             font-variant-numeric: tabular-nums; }
-  .tile .v small { font-size: 14px; font-weight: 500; color: var(--muted); }
-  .tile .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  /* model cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+           gap: 12px; margin-top: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+          padding: 15px 16px; }
+  .card b.t { display: block; margin-bottom: 5px; font-size: 14.5px; }
+  .card p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .card .mono.small { font-size: 12px; color: var(--accent); }
 
+  /* pipeline strip */
+  .pipe { display: flex; align-items: stretch; gap: 0; margin-top: 20px; overflow-x: auto;
+          padding-bottom: 4px; }
+  .pipe .stage { background: var(--surface); border: 1px solid var(--line);
+                 border-radius: 8px; padding: 10px 14px; min-width: 132px; flex: 1; }
+  .pipe .stage b { display: block; font-size: 13px; }
+  .pipe .stage span { font-size: 12px; color: var(--muted); }
+  .pipe .joint { align-self: center; padding: 0 8px; color: var(--accent);
+                 font-weight: 700; }
+
+  /* code blocks */
+  pre.block { background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+              padding: 16px 18px; overflow-x: auto; margin: 14px 0 0;
+              font: 13px/1.65 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  pre.block .c { color: #7d8590; }
+
+  /* tables */
   table { border-collapse: collapse; width: 100%; font-size: 13.5px;
           font-variant-numeric: tabular-nums; }
-  .tablewrap { overflow-x: auto; background: var(--surface);
-               border: 1px solid var(--line); border-radius: 6px; }
+  .tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line);
+               border-radius: 8px; margin-top: 14px; }
   th { text-align: left; font-size: 11.5px; text-transform: uppercase;
-       letter-spacing: 0.07em; color: var(--muted); font-weight: 600;
-       padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+       letter-spacing: 0.07em; color: var(--muted); font-weight: 600; padding: 9px 12px;
+       border-bottom: 1px solid var(--line); white-space: nowrap; }
   td { padding: 7px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
   tr:last-child td { border-bottom: 0; }
-  td.num { text-align: right; }  th.num { text-align: right; }
-
-  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px;
-          font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px;
+          font-weight: 600; white-space: nowrap; }
   .pill.good { color: var(--good); background: var(--good-bg); }
-  .pill.bad  { color: var(--bad);  background: var(--bad-bg); }
   .chip { display: inline-block; padding: 1px 8px; border-radius: 4px;
           background: var(--chip); font-size: 12px; white-space: nowrap; }
   .chip.data { color: var(--accent); font-weight: 600; }
+
+  /* evidence chart */
   .tierdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
-             margin-right: 6px; vertical-align: 0; }
-
-  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
-  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
-
-  #chartbox { background: var(--surface); border: 1px solid var(--line);
-              border-radius: 6px; padding: 14px 14px 6px; position: relative; }
+             margin-right: 6px; }
+  #chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+              padding: 14px 14px 6px; position: relative; margin-top: 14px; }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px;
             color: var(--muted); padding: 4px 2px 8px; }
   .legend b { color: var(--ink); font-weight: 600; }
@@ -108,64 +146,148 @@
          opacity: 0; transition: opacity 80ms; white-space: nowrap; z-index: 2; }
   @media (prefers-reduced-motion: reduce) { #tip { transition: none; } }
   svg text { fill: var(--muted); font: 11px ui-monospace, Menlo, monospace; }
-  a { color: var(--accent); }
-  footer { margin-top: 48px; padding-top: 14px; border-top: 1px solid var(--line);
-           color: var(--muted); font-size: 12.5px; }
+
+  footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
 
 <main>
-<header>
-  <h1><span class="spin">SPI</span>ndlebox</h1>
-  <div class="headmeta">
-    <span class="verdict">All tiers green</span>
-    <span class="mono">v1.0.0</span>
-    <span>public release</span>
-    <span>2026-07-23</span>
+
+<div class="hero">
+  <p class="eyebrow">SPIndleframe · Serialized Process Index</p>
+  <h1><span class="spin">Every function you own,</span> in one addressable index.</h1>
+  <p class="sub">SPIndlebox empirically decomposes codebases — Python, TypeScript, Go,
+  Rust, Bash, Java — into an <b>SPI</b>: a typed, nested, data-driven index of every
+  function. So nothing gets rebuilt that already exists, and migrating to another
+  language becomes mechanical instead of heroic.</p>
+  <div class="links">
+    <a class="btn solid" href="https://github.com/moonsoup/spindlebox">GitHub</a>
+    <a class="btn ghost" href="https://github.com/moonsoup/spindlebox#quick-start">Quick start</a>
+    <span class="verdict">v1.0.0 · all checks green</span>
   </div>
-</header>
+
+  <div class="demo">
+    <div class="tabs" role="tablist" aria-label="language"></div>
+    <pre id="demo-code" role="tabpanel"></pre>
+    <div class="collapse">
+      <span class="arrow">every one of these normalizes to</span>
+      <span class="sigclass">sig:str-&gt;list&lt;str&gt;</span>
+      <span class="arrow">— one signature class, five languages</span>
+    </div>
+  </div>
+</div>
 
 <section>
-  <p class="eyebrow">Scoreboard</p>
-  <div class="tiles">
-    <div class="tile"><div class="v">100<small>/100</small></div><div class="k">latest score, every tier</div></div>
-    <div class="tile"><div class="v">6 → 2</div><div class="k">input → output languages</div></div>
-    <div class="tile"><div class="v">47</div><div class="k">scored runs</div></div>
-    <div class="tile"><div class="v">12<small>/12</small></div><div class="k">issues found → fixed → verified</div></div>
-    <div class="tile"><div class="v">15</div><div class="k">real repos in corpus</div></div>
-    <div class="tile"><div class="v">311</div><div class="k">tests, 0 failing</div></div>
+  <p class="eyebrow">Why an index</p>
+  <h2>Your functions are data. Treat them like it.</h2>
+  <p class="lede">A data architect wouldn't run a warehouse where nobody knows what
+  tables exist, what their schemas are, or which three teams built the same one.
+  Most codebases are exactly that — for functions. The SPI is the catalog:</p>
+  <div class="cards">
+    <div class="card"><b class="t">Itemized functions</b>
+      <p>Every function, method, closure and lambda is an item with a sticky ordinal
+      and a dotted address: <span class="mono small">src.utils.io.Reader.read_lines</span></p></div>
+    <div class="card"><b class="t">Cross-language signature classes</b>
+      <p>Types normalize to a small core vocabulary, so the same shape in different
+      languages lands in the same class — dedup works <i>across</i> repos and languages.</p></div>
+    <div class="card"><b class="t">Context normalization</b>
+      <p>Every item gets a canonical <span class="mono small">ctx in → ctx out</span>
+      adapter. Heterogeneous functions become uniform, chainable ops.</p></div>
+    <div class="card"><b class="t">State-capture classes</b>
+      <p>Each item is classified pure / reads / mutates / consumes —
+      <span class="mono small">fn · Fn · FnMut · FnOnce</span> — before you ever port it.</p></div>
+    <div class="card"><b class="t">Homogeneous op arrays</b>
+      <p>Groups partition members by signature class: one element type per array,
+      enforced by <span class="mono small">spindlebox validate</span>, like any good schema.</p></div>
+    <div class="card"><b class="t">Typed pipelines</b>
+      <p><span class="mono small">pipeline define</span> type-checks stage N → N+1 at
+      definition time. Broken chains are refused before they run.</p></div>
   </div>
 </section>
 
 <section>
-  <p class="eyebrow">Language matrix — in through profiles, out through profiles</p>
+  <p class="eyebrow">The pipeline</p>
+  <h2>Source in, structure out, source back out.</h2>
+  <div class="pipe">
+    <div class="stage"><b>index</b><span>parse 6 languages into one SPI</span></div>
+    <div class="joint">→</div>
+    <div class="stage"><b>validate</b><span>schema, homogeneity, ctx types — non-zero exit on violation</span></div>
+    <div class="joint">→</div>
+    <div class="stage"><b>search · deps · gaps</b><span>ask questions across every indexed repo</span></div>
+    <div class="joint">→</div>
+    <div class="stage"><b>generate</b><span>compilable Rust or Java skeletons</span></div>
+    <div class="joint">→</div>
+    <div class="stage"><b>report</b><span>data-defined reports, four formats</span></div>
+  </div>
+  <pre class="block"><span class="c"># do I already have this?</span>
+spindlebox search "parse" --all-projects
+<span class="c"># port a whole project's shape to Rust — todo!() bodies, compiling crate</span>
+spindlebox generate --lang rust --out /tmp/port
+<span class="c"># what have I written twice?</span>
+spindlebox report dup-candidates</pre>
+</section>
+
+<section>
+  <p class="eyebrow">Everything is data</p>
+  <h2>Adding a language is a JSON file, not a fork.</h2>
+  <p class="lede">Input languages are <b>extraction profiles</b>; output languages are
+  <b>emit profiles</b>. A profile carries the grammar wheel, node-role tables, a type
+  table, identifier rules. Java — indexing <i>and</i> generation — exists entirely as
+  data: there is no <span class="mono">java_*.py</span> anywhere, and a test asserts it.</p>
+  <pre class="block"><span class="c">// emit_profiles/java.json — the parts that made real repos compile</span>
+"simple": {"str": "String", "i64": "Long", "bool": "Boolean", "unit": "Void"},
+"list_bases": ["List", "ArrayList", "Collection"],
+"reserved_member_names": ["clone", "equals", "hashCode", "toString", "wait"],
+"unique_result_binding": true</pre>
   <div class="tablewrap"><table>
-    <tr><th>Input</th><th>Extractor</th><th>Deepest proof</th>
-        <th>→ Rust</th><th>→ Java</th></tr>
+    <tr><th>Input</th><th>Extractor</th><th>Hardest proof</th><th>→ Rust</th><th>→ Java</th></tr>
     <tr><td>Python</td><td><span class="chip">native ast + symtable</span></td>
-        <td>T3 · pydantic, fastapi</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
+        <td>pydantic, fastapi</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
     <tr><td>TypeScript / JS</td><td><span class="chip data">profile (data)</span></td>
-        <td>T3 · zod</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
+        <td>zod</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
     <tr><td>Go</td><td><span class="chip data">profile (data)</span></td>
-        <td>T3 · gin</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
+        <td>gin</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
     <tr><td>Rust</td><td><span class="chip data">profile (data)</span></td>
-        <td>T2 · serde_json</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
+        <td>serde_json</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
     <tr><td>Bash</td><td><span class="chip data">profile (data)</span></td>
-        <td>T1 · bats-core</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
+        <td>bats-core</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
     <tr><td>Java</td><td><span class="chip data">profile (data)</span></td>
-        <td>T1 · gson</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
+        <td>gson</td><td><span class="pill good">compiles</span></td><td><span class="pill good">compiles</span></td></tr>
   </table></div>
-  <p class="note">Every input decomposes to the same neutral SPI, so any cell pairs with any
-  output — Go in, Java out is one command. Output backends: Rust via the legacy hand-written
-  module (its emit profile is held byte-identical by differential test); <b>Java exists only as
-  data</b> — one JSON emit profile, no backend module, javac-checked in CI. Go and Bash
-  extraction runs through the generic profile walker, differential-proven against the legacy
-  extractors. Adding a language in either direction = one JSON profile + a pinned grammar wheel.</p>
+  <p class="lede" style="margin-top:12px">Any row pairs with any output column —
+  Go in, Java out is one command. Legacy hand-written extractors remain in-tree as
+  reference implementations, held byte-identical by differential tests.</p>
 </section>
 
 <section>
-  <p class="eyebrow">Score history — 47 runs, tier ladder T0 → T3</p>
+  <p class="eyebrow">Reports</p>
+  <h2>Ask your codebase questions. In table form.</h2>
+  <p class="lede">Reports are <b>stacks</b> — small data files chaining
+  <span class="mono">ctx → ctx</span> ops, validated end-to-end before they run, rendered
+  to markdown, CSV, HTML or JSON by one renderer. Real output, real codebase:</p>
+  <div class="tablewrap"><table>
+    <tr><th>project</th><th>items</th><th>type slots</th><th>untyped %</th><th>worst files</th></tr>
+    <tr><td class="mono">oligolia</td><td>2494</td><td>5931</td><td><b>79.8</b></td>
+        <td class="mono" style="font-size:12px">assets/3Dmol-min.js (3720/3720) — a vendored blob, caught red-handed</td></tr>
+    <tr><td class="mono">spindlebox</td><td>389</td><td>851</td><td><b>54.8</b></td>
+        <td class="mono" style="font-size:12px">schema.py (43/69); test files untyped by habit</td></tr>
+    <tr><td class="mono">miniproj_java</td><td>9</td><td>17</td><td><b>0.0</b></td><td></td></tr>
+  </table></div>
+  <pre class="block">spindlebox report typing-health          <span class="c"># the table above</span>
+spindlebox report dup-candidates --format html --out dups.html
+spindlebox report compile-matrix --project myproj</pre>
+</section>
+
+<section>
+  <p class="eyebrow">Evidence</p>
+  <h2>Hardened against real code, in public.</h2>
+  <p class="lede">A continuous test ladder runs spindlebox against 15 real repositories
+  — from fixtures up to pydantic, fastapi, zod and gin — scoring every run: index
+  cleanly, validate, generate, <i>compile</i>. Every red became a GitHub issue, a fix,
+  and a live re-verification. 12 issues found → fixed → verified; 47 scored runs;
+  all tiers green at v1.0.0.</p>
   <div id="chartbox">
     <div class="legend">
       <span><i class="tierdot" style="background:var(--t0)"></i><b>T0</b> fixtures</span>
@@ -176,75 +298,64 @@
     <div id="chart"></div>
     <div id="tip"></div>
   </div>
-  <p class="note">Each dip is a tier opening and finding something real; each recovery is a fix
-  verified live on the VPS. The full run log is in the table below.</p>
+  <p class="lede" style="margin-top:12px">Each dip is a tier opening and finding
+  something real — duplicate ordinals in pydantic, a Rust keyword collision, a Java
+  <span class="mono">clone()</span> illegally hiding <span class="mono">Object.clone()</span>.
+  Each recovery is a verified fix. The full ledger lives in the
+  <a href="https://github.com/moonsoup/spindlebox/issues?q=is%3Aissue">issue tracker</a>.</p>
 </section>
 
 <section>
-  <p class="eyebrow">Hardening ledger — every red became an issue, a fix, and a live re-verification</p>
-  <div class="tablewrap"><table>
-    <tr><th>#</th><th>Found by</th><th>Defect</th><th>Fixed in</th><th>State</th></tr>
-    <tr><td class="mono">1</td><td>T0</td><td>Generated ctx wrapper shadowed the closure’s ctx binding when a source param was named <span class="mono">ctx</span></td><td class="mono">0.3.x</td><td><span class="pill good">verified</span></td></tr>
-    <tr><td class="mono">2–5</td><td>T0–T1</td><td>Early cargo_check failures (wrapper types, module layout); #2 also exposed a loop bug — infra errors misread as reproductions</td><td class="mono">0.3–0.4, 0.6.0</td><td><span class="pill good">verified</span></td></tr>
-    <tr><td class="mono">6</td><td>T1 · memchr</td><td>Module segments shadowed prelude types / collided after lossy sanitization (E0573, E0428)</td><td class="mono">0.4.2</td><td><span class="pill good">verified</span></td></tr>
-    <tr><td class="mono">7</td><td>T2 · serde_json</td><td>Two blank <span class="mono">_</span> params → duplicate binding, then wrong ctx routing (E0415, E0308)</td><td class="mono">0.5.2–0.5.3</td><td><span class="pill good">verified</span></td></tr>
-    <tr><td class="mono">8</td><td>T3 · pydantic</td><td>Two anonymous items on one line collided into one address → duplicate ordinals</td><td class="mono">0.6.0</td><td><span class="pill good">verified</span></td></tr>
-    <tr><td class="mono">9</td><td>T3 · pydantic</td><td>Digit-leading module identifiers; uncoded cargo errors escaped issue filing</td><td class="mono">0.5.5–0.6.0</td><td><span class="pill good">verified</span></td></tr>
-    <tr><td class="mono">10</td><td>T3 · pydantic</td><td>Distinct ctx keys sanitized to one Rust identifier → duplicate struct field (E0124)</td><td class="mono">0.6.1</td><td><span class="pill good">verified</span></td></tr>
-    <tr><td class="mono">11</td><td>T2 · flask <b>javac</b></td><td>Source param named <span class="mono">result</span> redeclared the wrapper’s local — legal in Rust (shadowing), illegal in Java</td><td class="mono">0.8.1</td><td><span class="pill good">verified</span></td></tr>
-    <tr><td class="mono">12</td><td>T2 · click <b>javac</b></td><td>Zero-arg function named <span class="mono">clone</span> illegally hid <span class="mono">Object.clone()</span> — Object member names now escaped via profile data</td><td class="mono">0.8.1</td><td><span class="pill good">verified</span></td></tr>
-  </table></div>
-  <p class="note">The loop ground Java exactly as it ground Rust: javac found two real
-  Java-vs-Rust semantic gaps in its first pass over T2 repos (#11, #12), both fixed as
-  profile data + one engine rule, verified against the original repro chains, and closed.</p>
-</section>
-
-<section class="cols">
-  <div>
-    <p class="eyebrow">Corpus tiers</p>
-    <div class="tablewrap"><table>
-      <tr><th>Tier</th><th>Bar</th><th>Targets</th></tr>
-      <tr><td><i class="tierdot" style="background:var(--t0)"></i>T0</td><td class="num mono">95</td>
-          <td>8 fixture projects, all 6 languages + mixed</td></tr>
-      <tr><td><i class="tierdot" style="background:var(--t1)"></i>T1</td><td class="num mono">90</td>
-          <td>itsdangerous · p-limit · memchr · cobra · bats-core · gson</td></tr>
-      <tr><td><i class="tierdot" style="background:var(--t2)"></i>T2</td><td class="num mono">90</td>
-          <td>click · express · serde_json · flask</td></tr>
-      <tr><td><i class="tierdot" style="background:var(--t3)"></i>T3</td><td class="num mono">90</td>
-          <td>fastapi · pydantic · zod · gin</td></tr>
-    </table></div>
-  </div>
-  <div>
-    <p class="eyebrow">Version rail</p>
-    <div class="tablewrap"><table>
-      <tr><th>v</th><th>What landed</th></tr>
-      <tr><td class="mono">0.3–0.4</td><td>T0/T1 green; module-shadow and wrapper fixes</td></tr>
-      <tr><td class="mono">0.5</td><td>T2/T3 corpus; probes; blank-param and keyword hygiene</td></tr>
-      <tr><td class="mono">0.6</td><td>Index dedup; injective ctx fields; loop robustness</td></tr>
-      <tr><td class="mono">0.7</td><td><b>Input profiles</b> — Java indexed as pure data</td></tr>
-      <tr><td class="mono">0.8</td><td><b>Emit profiles</b> — Java generated as pure data; report CSV/HTML exports; #11 #12 fixed</td></tr>
-      <tr><td class="mono">0.9</td><td><b>Migration complete</b> — Rust and JS/TS extraction through profiles, differential-proven</td></tr>
-      <tr><td class="mono">0.10</td><td><b>SPIndlestacks</b> — reports defined as data, validated like pipelines</td></tr>
-      <tr><td class="mono">1.0</td><td><b>Public release</b></td></tr>
-    </table></div>
-  </div>
-</section>
-
-<section>
-  <p class="eyebrow">Run log</p>
-  <div class="tablewrap" style="max-height: 340px; overflow-y: auto;"><table id="runs">
-    <tr><th>Run</th><th>Tier</th><th class="num">Score</th><th class="num">Bar</th>
-        <th class="num">Stages</th><th class="num">Fails</th><th>Version</th><th>State</th></tr>
-  </table></div>
+  <p class="eyebrow">Start</p>
+  <h2>Index something in the next two minutes.</h2>
+  <pre class="block">git clone https://github.com/moonsoup/spindlebox && cd spindlebox
+pip3 install -e ".[dev]"
+spindlebox index ~/code/yourproject     <span class="c"># → .spi/index.json + registry</span>
+spindlebox validate --strict
+spindlebox report typing-health</pre>
 </section>
 
 <footer>
-  Hardened by a continuous test ladder (internal harness, not part of the distribution):
-  test → record → issue → fix → verify live → close with commit hash. Reports: <span class="mono">spindlebox report</span> (see docs/REPORTING.md) · <a href="https://github.com/moonsoup/spindlebox">github.com/moonsoup/spindlebox</a>
+  SPIndlebox v1.0.0 · MIT ·
+  <a href="https://github.com/moonsoup/spindlebox">github.com/moonsoup/spindlebox</a> ·
+  <a href="https://github.com/moonsoup/spindlebox/blob/main/docs/REPORTING.md">reporting guide</a> ·
+  <a href="https://github.com/sponsors/moonsoup">sponsor</a>
 </footer>
 </main>
 
 <script>
+const SAMPLES = {
+  "python":     '<span class="kw">def</span> <span class="fn">read_lines</span>(path: <span class="ty">str</span>) -> <span class="ty">list</span>[<span class="ty">str</span>]:\n    <span class="kw">return</span> Path(path).read_text().splitlines()',
+  "typescript": '<span class="kw">function</span> <span class="fn">readLines</span>(path: <span class="ty">string</span>): <span class="ty">string</span>[] {\n  <span class="kw">return</span> readFileSync(path, "utf8").split("\\n");\n}',
+  "go":         '<span class="kw">func</span> <span class="fn">ReadLines</span>(path <span class="ty">string</span>) []<span class="ty">string</span> {\n  data, _ := os.ReadFile(path)\n  <span class="kw">return</span> strings.Split(<span class="ty">string</span>(data), "\\n")\n}',
+  "rust":       '<span class="kw">fn</span> <span class="fn">read_lines</span>(path: &amp;<span class="ty">str</span>) -> <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {\n  fs::read_to_string(path).unwrap().lines().map(<span class="ty">String</span>::from).collect()\n}',
+  "java":       '<span class="kw">static</span> <span class="ty">List</span>&lt;<span class="ty">String</span>&gt; <span class="fn">readLines</span>(<span class="ty">String</span> path) {\n  <span class="kw">return</span> Files.readAllLines(Path.of(path));\n}',
+};
+
+const tabbar = document.querySelector(".tabs");
+const panel = document.getElementById("demo-code");
+Object.keys(SAMPLES).forEach((lang, i) => {
+  const b = document.createElement("button");
+  b.textContent = lang;
+  b.setAttribute("role", "tab");
+  b.setAttribute("aria-selected", i === 0);
+  b.addEventListener("click", () => {
+    tabbar.querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", "false"));
+    b.setAttribute("aria-selected", "true");
+    panel.innerHTML = SAMPLES[lang];
+  });
+  tabbar.appendChild(b);
+});
+panel.innerHTML = SAMPLES.python;
+let demoIdx = 0;
+if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  setInterval(() => {
+    if (document.hidden) return;
+    demoIdx = (demoIdx + 1) % 5;
+    tabbar.querySelectorAll("button")[demoIdx].click();
+  }, 3500);
+}
+
 const RUNS = [
 ["r-20260722-210525",0,100.0,95,true,43,0,"0.3.0"],["r-20260722-210556",0,100.0,95,true,43,0,"0.3.0"],
 ["r-20260722-212116",0,100.0,95,true,43,0,"0.3.0"],["r-20260722-212349",0,100.0,95,true,43,0,"0.3.1"],
@@ -276,12 +387,12 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 
 function drawChart() {
   const tierCol = [css("--t0"), css("--t1"), css("--t2"), css("--t3")];
-  const W = Math.min(1000, document.getElementById("chart").clientWidth || 1000);
-  const H = 240, L = 40, R = 12, T = 10, B = 24;
+  const W = Math.min(980, document.getElementById("chart").clientWidth || 980);
+  const H = 230, L = 40, R = 12, T = 10, B = 24;
   const x = i => L + i * (W - L - R) / (RUNS.length - 1);
   const y = s => T + (101 - s) * (H - T - B) / (101 - 84);
   let e = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" role="img"
-    aria-label="Score per run, colored by tier">`;
+    aria-label="Score per hardening run, colored by tier">`;
   for (const g of [85, 90, 95, 100]) {
     e += `<line x1="${L}" x2="${W - R}" y1="${y(g)}" y2="${y(g)}"
       stroke="var(--line-soft)" stroke-width="1"/>
@@ -322,22 +433,7 @@ function drawChart() {
   });
 }
 
-function fillTable() {
-  const tbl = document.getElementById("runs");
-  [...RUNS].reverse().forEach(r => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td class="mono">${r[0]}</td>
-      <td><i class="tierdot" style="background:${css("--t" + r[1])}"></i>T${r[1]}</td>
-      <td class="num mono">${r[2].toFixed(1)}</td><td class="num mono">${r[3]}</td>
-      <td class="num mono">${r[5]}</td><td class="num mono">${r[6]}</td>
-      <td class="mono">${r[7]}</td>
-      <td>${r[4] ? '<span class="pill good">green</span>' : '<span class="pill bad">red</span>'}</td>`;
-    tbl.appendChild(tr);
-  });
-}
-
 drawChart();
-fillTable();
 new MutationObserver(drawChart).observe(document.documentElement,
   { attributes: true, attributeFilter: ["data-theme"] });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawChart);

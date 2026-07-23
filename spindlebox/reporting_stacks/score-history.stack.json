@@ -1,6 +1,6 @@
 {
   "report": "score-history",
-  "description": "Every slamface run ever scored",
+  "description": "Every hardening-harness run scored",
   "stages": [
     "collect.score_history",
     "render.table"

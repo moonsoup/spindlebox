@@ -33,7 +33,7 @@ spindlebox = ["extract/profiles/*.json", "generate/emit_profiles/*.json",
               "reporting_stacks/*.stack.json"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "slamface/tests"]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100

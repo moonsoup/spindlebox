@@ -169,7 +169,7 @@ def collect_compile_matrix(ctx):
 
 @report_op("collect.score_history", requires={"state_dir"}, provides={"title", "columns", "rows"})
 def collect_score_history(ctx):
-    """slamface score-per-run history from a pulled state directory."""
+    """Hardening-harness score-per-run history from a pulled state directory."""
     rows = []
     for path in sorted(Path(ctx["state_dir"]).expanduser().glob("score-r-*.json")):
         try:
@@ -179,7 +179,7 @@ def collect_score_history(ctx):
         rows.append({k: s.get(k) for k in (
             "run_id", "tier", "score", "threshold", "green", "stages", "failures",
             "spindlebox_version")})
-    ctx.update(title="Score history — every slamface run",
+    ctx.update(title="Score history — every harness run",
                columns=["run_id", "tier", "score", "threshold", "green", "stages",
                         "failures", "spindlebox_version"],
                rows=rows)
