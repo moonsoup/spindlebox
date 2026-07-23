@@ -53,7 +53,16 @@
              color: var(--accent); font-weight: 700; margin: 0 0 6px; }
 
   /* hero */
-  .hero { padding: 26px 0 8px; }
+  .hero { padding: 26px 0 8px; display: grid; gap: 10px 30px;
+          grid-template-columns: 1fr 240px;
+          grid-template-areas: "intro ticker" "demo demo"; }
+  .hero-intro { grid-area: intro; }
+  .stackticker { grid-area: ticker; }
+  .demo { grid-area: demo; }
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; grid-template-areas: "intro" "demo"; }
+    .stackticker { display: none; }
+  }
   .hero h1 { font-size: clamp(30px, 5.4vw, 46px); line-height: 1.12; margin: 0 0 12px;
              letter-spacing: -0.025em; text-wrap: balance; max-width: 21ch; }
   .hero h1 .spin { color: var(--accent); }
@@ -73,6 +82,31 @@
   /* the demo: five languages, one signature class */
   .demo { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
           margin-top: 30px; overflow: hidden; }
+  .dirtabs { display: flex; border-bottom: 1px solid var(--line); background: var(--chip); }
+  .dirtabs button { flex: 1; font: 700 13px/1 ui-monospace, Menlo, monospace;
+                    letter-spacing: 0.03em; padding: 11px 16px; border: 0;
+                    background: none; color: var(--muted); cursor: pointer;
+                    border-bottom: 2px solid transparent; }
+  .dirtabs button[aria-selected="true"] { color: var(--accent);
+                    border-bottom-color: var(--accent); background: var(--surface); }
+  .dirtabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .demo .collapse .tabs { border-bottom: 0; }
+  .demo .collapse:first-of-type { border-top: 0; border-bottom: 1px solid var(--line); }
+
+  /* SPIndlestacks ticker — deliberately monochrome terminal-green, both themes */
+  .stackticker { background: #04120a; border: 1px solid #14522c; border-radius: 10px;
+                 overflow: hidden; position: relative; min-height: 280px;
+                 -webkit-mask-image: linear-gradient(transparent, black 16%, black 84%, transparent);
+                 mask-image: linear-gradient(transparent, black 16%, black 84%, transparent); }
+  .stackticker .scroll { position: absolute; inset: 0 auto auto 0; width: 100%;
+                 padding: 12px 14px; white-space: pre; color: #35e57e;
+                 font: 11px/1.75 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+                 text-shadow: 0 0 6px rgba(53, 229, 126, 0.35);
+                 animation: tickscroll 26s linear infinite; }
+  .stackticker .scroll .dim { color: #1d8f4e; }
+  @keyframes tickscroll { from { transform: translateY(0); }
+                          to { transform: translateY(-50%); } }
+  @media (prefers-reduced-motion: reduce) { .stackticker .scroll { animation: none; } }
   .tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
   .tabs button { font: 600 13px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.02em;
                  padding: 11px 16px; border: 0; background: none; color: var(--muted);
@@ -92,13 +126,14 @@
   .kw { color: #8fb573; } .ty { color: #6fb3d2; } .fn { color: #e0b26a; }
 
   /* model cards */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-           gap: 12px; margin-top: 18px; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr);
+           gap: 14px; margin-top: 18px; }
+  @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
-          padding: 15px 16px; }
-  .card b.t { display: block; margin-bottom: 5px; font-size: 14.5px; }
-  .card p { margin: 0; font-size: 13.5px; color: var(--muted); }
-  .card .mono.small { font-size: 12px; color: var(--accent); }
+          padding: 18px 19px; }
+  .card b.t { display: block; margin-bottom: 7px; font-size: 16px; }
+  .card p { margin: 0; font-size: 14.5px; color: var(--muted); line-height: 1.55; }
+  .card .mono.small { font-size: 13px; color: var(--accent); }
 
   /* pipeline strip */
   .pipe { display: flex; align-items: stretch; gap: 0; margin-top: 20px; overflow-x: auto;
@@ -156,6 +191,7 @@
 <main>
 
 <div class="hero">
+<div class="hero-intro">
   <p class="eyebrow">SPIndleframe · Serialized Process Index</p>
   <h1><span class="spin">Every function you own,</span> in one addressable index.</h1>
   <p class="sub">SPIndlebox empirically decomposes codebases — Python, TypeScript, Go,
@@ -164,18 +200,24 @@
   language becomes mechanical instead of heroic.</p>
   <div class="links">
     <a class="btn solid" href="https://github.com/moonsoup/spindlebox">GitHub</a>
-    <a class="btn ghost" href="https://github.com/moonsoup/spindlebox#quick-start">Quick start</a>
+    <a class="btn ghost" href="https://moonsoup.github.io/spindlebox/guide/">Docs</a>
+    <a class="btn ghost" href="https://github.com/sponsors/moonsoup">Donate</a>
     <span class="verdict">v1.0.0 · all checks green</span>
   </div>
+</div>
+
+<div class="stackticker" aria-hidden="true">
+  <div class="scroll" id="ticker"></div>
+</div>
 
   <div class="demo">
-    <div class="tabs" role="tablist" aria-label="language"></div>
-    <pre id="demo-code" role="tabpanel"></pre>
-    <div class="collapse">
-      <span class="arrow">every one of these normalizes to</span>
-      <span class="sigclass">sig:str-&gt;list&lt;str&gt;</span>
-      <span class="arrow">— one signature class, five languages</span>
+    <div class="dirtabs" role="tablist" aria-label="direction">
+      <button data-mode="normalize" aria-selected="true">source → SPI</button>
+      <button data-mode="generate" aria-selected="false">SPI → skeleton</button>
     </div>
+    <div class="collapse" id="demo-top"></div>
+    <pre id="demo-code" role="tabpanel"></pre>
+    <div class="collapse" id="demo-bottom"></div>
   </div>
 </div>
 
@@ -332,29 +374,101 @@ const SAMPLES = {
   "java":       '<span class="kw">static</span> <span class="ty">List</span>&lt;<span class="ty">String</span>&gt; <span class="fn">readLines</span>(<span class="ty">String</span> path) {\n  <span class="kw">return</span> Files.readAllLines(Path.of(path));\n}',
 };
 
-const tabbar = document.querySelector(".tabs");
+const SKELETONS = {
+  "rust": '<span class="kw">pub fn</span> <span class="fn">read_lines</span>(path: <span class="ty">String</span>) -> <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {\n    todo!()\n}\n\n<span class="kw">pub fn</span> <span class="fn">read_lines_op</span>() -> crate::<span class="ty">CtxOp</span> { <span class="kw">...</span> }',
+  "java": '<span class="kw">public static</span> <span class="ty">java.util.List</span>&lt;<span class="ty">String</span>&gt; <span class="fn">readLines</span>(<span class="ty">String</span> path) {\n    <span class="kw">throw new</span> <span class="ty">UnsupportedOperationException</span>("TODO");\n}\n\n<span class="kw">public static</span> <span class="ty">CtxOp</span> <span class="fn">readLines_op</span>() { <span class="kw">...</span> }',
+};
+
+const SIG_CHIP = '<span class="sigclass">sig:str-&gt;list&lt;str&gt;</span>';
 const panel = document.getElementById("demo-code");
-Object.keys(SAMPLES).forEach((lang, i) => {
-  const b = document.createElement("button");
-  b.textContent = lang;
-  b.setAttribute("role", "tab");
-  b.setAttribute("aria-selected", i === 0);
+const topBox = document.getElementById("demo-top");
+const bottomBox = document.getElementById("demo-bottom");
+const dirtabs = document.querySelector(".dirtabs");
+let mode = "normalize";
+let currentLang = { normalize: "python", generate: "rust" };
+
+function langTabsHtml(langs, active) {
+  return '<div class="tabs" role="tablist" aria-label="language">' +
+    langs.map(l => `<button role="tab" data-lang="${l}"
+      aria-selected="${l === active}">${l}</button>`).join("") + "</div>";
+}
+
+function renderDemo() {
+  const langs = mode === "normalize" ? Object.keys(SAMPLES) : Object.keys(SKELETONS);
+  if (!langs.includes(currentLang[mode])) currentLang[mode] = langs[0];
+  const active = currentLang[mode];
+  if (mode === "normalize") {
+    topBox.innerHTML = langTabsHtml(langs, active);
+    panel.innerHTML = SAMPLES[active];
+    bottomBox.innerHTML = `<span class="arrow">every one of these normalizes to</span>
+      ${SIG_CHIP} <span class="arrow">— one signature class, five languages</span>`;
+  } else {
+    topBox.innerHTML = `${SIG_CHIP}
+      <span class="arrow">extends back out — one signature class, regenerated as a
+      compilable skeleton in any output language</span>`;
+    panel.innerHTML = SKELETONS[active];
+    bottomBox.innerHTML = langTabsHtml(langs, active);
+  }
+  document.querySelectorAll(".demo .tabs button").forEach(b =>
+    b.addEventListener("click", () => {
+      currentLang[mode] = b.dataset.lang;
+      renderDemo();
+    }));
+}
+
+dirtabs.querySelectorAll("button").forEach(b =>
   b.addEventListener("click", () => {
-    tabbar.querySelectorAll("button").forEach(x => x.setAttribute("aria-selected", "false"));
-    b.setAttribute("aria-selected", "true");
-    panel.innerHTML = SAMPLES[lang];
-  });
-  tabbar.appendChild(b);
-});
-panel.innerHTML = SAMPLES.python;
-let demoIdx = 0;
+    mode = b.dataset.mode;
+    dirtabs.querySelectorAll("button").forEach(x =>
+      x.setAttribute("aria-selected", x === b));
+    renderDemo();
+  }));
+renderDemo();
+
 if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
   setInterval(() => {
     if (document.hidden) return;
-    demoIdx = (demoIdx + 1) % 5;
-    tabbar.querySelectorAll("button")[demoIdx].click();
+    const langs = mode === "normalize" ? Object.keys(SAMPLES) : Object.keys(SKELETONS);
+    const next = langs[(langs.indexOf(currentLang[mode]) + 1) % langs.length];
+    currentLang[mode] = next;
+    renderDemo();
   }, 3500);
 }
+
+// ---- SPIndlestacks ticker ----
+const TICKER_LINES = [
+  "SPIndlestacks",
+  "<span class=\"dim\">reports as data, ops as ctx chains</span>",
+  "",
+  "$ spindlebox report typing-health",
+  "<span class=\"dim\">collect.typing_health</span>",
+  "  → render.table  <span class=\"dim\">[ok]</span>",
+  "ctx in → ctx out  ✓ validated",
+  "",
+  "$ spindlebox report dup-candidates",
+  "<span class=\"dim\">collect.dup_candidates</span>",
+  "  → render.table  <span class=\"dim\">[ok]</span>",
+  "sig:str->list<str>  ×5 langs",
+  "sig:list<str>->result<str,i64>",
+  "",
+  "$ spindlebox report profile-coverage",
+  "<span class=\"dim\">collect.profile_coverage</span>",
+  "  → render.table  <span class=\"dim\">[ok]</span>",
+  "missing: —  <span class=\"dim\">all exercised</span>",
+  "",
+  "$ spindlebox report compile-matrix",
+  "<span class=\"dim\">collect.compile_matrix</span>",
+  "  → render.table  <span class=\"dim\">[ok]</span>",
+  "rust ✓  java ✓",
+  "",
+  "util.io.read_lines  <span class=\"dim\">[pure→fn]</span>",
+  "app.make_counter.bump  <span class=\"dim\">[FnMut]</span>",
+  "TextKit.readLines  <span class=\"dim\">[pure→fn]</span>",
+  "inner.Token.consume  <span class=\"dim\">[FnOnce]</span>",
+  "",
+];
+const half = TICKER_LINES.join("\n");
+document.getElementById("ticker").innerHTML = half + "\n" + half;
 
 const RUNS = [
 ["r-20260722-210525",0,100.0,95,true,43,0,"0.3.0"],["r-20260722-210556",0,100.0,95,true,43,0,"0.3.0"],

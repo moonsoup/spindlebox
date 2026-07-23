@@ -96,3 +96,22 @@ def test_cli_out_file(two_projects, tmp_path, capsys):
     assert cli_main(["report", "dup-candidates", "--format", "html",
                      "--out", str(out)]) == 0
     assert out.read_text().startswith("<!doctype html>")
+
+
+def test_compile_matrix_surfaces_backend_failure(two_projects, monkeypatch):
+    """The FAIL branch must actually fire — a report that can only say 'ok'
+    verifies nothing (no healthy project had ever exercised it)."""
+    from spindlebox import generate as gen_pkg
+
+    class ExplodingBackend:
+        name = "boom"
+
+        def generate(self, idx, options):
+            raise RuntimeError("deliberate")
+
+    monkeypatch.setitem(gen_pkg.BACKENDS, "boom", ExplodingBackend)
+    stack = reporting.list_stacks()["compile-matrix"]
+    ctx = reporting.run_stack(stack, {"format": "json"})
+    rows = json.loads(ctx["output"])["rows"]
+    assert rows and all(r["boom"] == "FAIL: RuntimeError" for r in rows)
+    assert all(r["rust"].startswith("ok") for r in rows)  # healthy backends unaffected
