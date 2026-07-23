@@ -23,7 +23,9 @@ REPO = Path(__file__).parent.parent
 DOCS = sorted((REPO / "docs" / "guide").glob("*.md")) + [REPO / "docs" / "REPORTING.md"]
 FIXTURES = REPO / "tests" / "fixtures"
 
-_BLOCK = re.compile(r"^    \$ (spindlebox .+)\n((?:^    .*\n|^\n(?=    ))*)", re.M)
+# a '    $ spindlebox' line starts a new example; indented non-'$' lines are its
+# expected output (blank lines allowed between output chunks)
+_BLOCK = re.compile(r"^    \$ (spindlebox .+)\n((?:^    (?!\$ ).*\n|^\n(?=    ))*)", re.M)
 
 
 def _examples():

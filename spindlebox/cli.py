@@ -91,6 +91,9 @@ def cmd_index(args) -> int:
     )
     for e in getattr(idx, "parse_errors", []):
         print(f"  skipped: {e}", file=sys.stderr)
+    if idx.parse_errors:
+        print(f"  NOTE: {len(idx.parse_errors)} file(s) skipped — recorded in the "
+              f"index; 'validate' warns, '--strict' fails on them", file=sys.stderr)
     for w in warnings if args.verbose else []:
         print(f"  warning: {w}", file=sys.stderr)
     if errors:
@@ -295,8 +298,24 @@ def cmd_pipeline(args) -> int:
                 print(f"error: {e}", file=sys.stderr)
             return 1
         idx.pipelines[-1].checked = True
+        from spindlebox.validate import pipeline_edges
+        stage_items = [idx.item_by_ordinal(o) for o in ordinals]
+        idx.pipelines[-1].edges = pipeline_edges(stage_items)
         idx.save(index_path)
-        print(f"pipeline '{args.name}' defined and type-checked ({len(ordinals)} stages)")
+        n_edges = len(idx.pipelines[-1].edges)
+        print(f"pipeline '{args.name}' defined and type-checked "
+              f"({len(ordinals)} stages, {n_edges} data-flow edge(s))")
+        return 0
+    if args.pipe_cmd == "run":
+        from spindlebox.dispatch import run_pipeline
+        try:
+            ctx = json.loads(args.ctx)
+        except json.JSONDecodeError as e:
+            raise CliError(f"--ctx is not valid JSON: {e}") from e
+        if not isinstance(ctx, dict):
+            raise CliError("--ctx must be a JSON object")
+        result = run_pipeline(idx, root, args.name, ctx)
+        print(json.dumps(result, indent=1, default=str))
         return 0
     if args.pipe_cmd == "check":
         errors, _ = validate_index(idx)
@@ -511,7 +530,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", help="write output to a file instead of stdout")
     p.set_defaults(func=cmd_report)
 
-    p = sub.add_parser("pipeline", help="define/check/list ordered pipelines")
+    p = sub.add_parser("pipeline", help="define/check/run/list ordered pipelines")
     pipe_sub = p.add_subparsers(dest="pipe_cmd", required=True)
     d = pipe_sub.add_parser("define")
     d.add_argument("name")
@@ -520,6 +539,11 @@ def build_parser() -> argparse.ArgumentParser:
     c = pipe_sub.add_parser("check")
     c.add_argument("name")
     _add_project_arg(c)
+    r = pipe_sub.add_parser("run", help="execute a pipeline (Python stages), "
+                                        "applying its data-flow edges")
+    r.add_argument("name")
+    r.add_argument("--ctx", required=True, help="JSON object seeding the context")
+    _add_project_arg(r)
     ls = pipe_sub.add_parser("list")
     _add_project_arg(ls)
     p.set_defaults(func=cmd_pipeline)

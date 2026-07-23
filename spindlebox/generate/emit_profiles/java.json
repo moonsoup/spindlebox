@@ -241,7 +241,8 @@
     "pipeline_close": "    }",
     "footer": [
       "}"
-    ]
+    ],
+    "pipeline_edge_op": "(CtxOp) (__ctx) -> { __ctx.${dst} = (${dsttype}) (Object) __ctx.${src}; }"
   },
   "files": [
     {

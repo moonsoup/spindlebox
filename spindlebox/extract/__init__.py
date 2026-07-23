@@ -174,7 +174,7 @@ def build_index(
         retired_ordinals=retired,
     )
     if errors:
-        index.parse_errors = errors  # advisory, not serialized
+        index.parse_errors = errors  # serialized: an index must never hide skipped files
     return index
 
 

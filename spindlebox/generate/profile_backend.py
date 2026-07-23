@@ -344,8 +344,24 @@ class ProfileBackend(GeneratorBackend):
                 if not all(refs):
                     lines.append(_sub(T["pipeline_skip"], name=pipe.name, **gvars))
                     continue
+                # data-flow edges — a direct chain without them never composes
+                from spindlebox.validate import pipeline_edges
+                edges = pipe.edges or pipeline_edges([s for s in stages if s])
+                by_after: dict[int, list[dict]] = {}
+                for e in edges:
+                    by_after.setdefault(e["after"], []).append(e)
+                elems: list[str] = []
+                for stage, ref in zip(stages, refs, strict=True):
+                    elems.append(ref)
+                    for e in by_after.get(stage.ordinal, ()):
+                        elems.append(_sub(
+                            T["pipeline_edge_op"],
+                            src=ctx_fields.get(e["from_key"], p.ident(e["from_key"])),
+                            dst=ctx_fields.get(e["to_key"], p.ident(e["to_key"])),
+                            dsttype=p.render_type(index.ctx_schema.get(e["to_key"], "any")),
+                            **gvars))
                 lines.append(_sub(T["pipeline_open"], name=p.ident(pipe.name), **gvars))
-                lines.append(_sub(T["pipeline_body"], refs=", ".join(refs), **gvars))
+                lines.append(_sub(T["pipeline_body"], refs=", ".join(elems), **gvars))
                 lines.append(_sub(T["pipeline_close"], **gvars))
         lines += T.get("footer", [])
 

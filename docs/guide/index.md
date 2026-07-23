@@ -4,7 +4,7 @@
 
 SPIndlebox decomposes codebases — Python, TypeScript/JavaScript, Go, Rust, Bash,
 Java — into an **SPI** (Serialized Process Index): a typed, addressable index of
-every function, method, closure and lambda. Once a project is indexed you can
+every statically discoverable function, method, closure and lambda. Once a project is indexed you can
 query it, validate it like a compiler, execute items through a normalized
 context, regenerate its shape in another language, mine it for dead code and
 latent pipelines, and report on it — all from one command.

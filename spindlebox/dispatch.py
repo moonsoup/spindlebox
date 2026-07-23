@@ -70,3 +70,39 @@ def call_item(index: ScaIndex, root: str | Path, selector: str, ctx: dict[str, A
     if item.ctx_adapter.return_key:
         out[item.ctx_adapter.return_key] = result
     return out
+
+
+def run_pipeline(index: ScaIndex, root: str | Path, name: str,
+                 ctx: dict[str, Any]) -> dict:
+    """Execute a defined pipeline stage by stage, applying its edge bindings.
+
+    Edges carry stage N's result into stage N+1's input key — without them a
+    direct chain is type-approved but never composes (double→triple would
+    yield triple(x), not triple(double(x))).
+    """
+    pipe = next((p for p in index.pipelines if p.name == name), None)
+    if pipe is None:
+        raise DispatchError(f"no pipeline named '{name}' "
+                            f"(have: {[p.name for p in index.pipelines]})")
+    stages = []
+    for ordinal in pipe.stages:
+        item = index.item_by_ordinal(ordinal)
+        if item is None:
+            raise DispatchError(f"pipeline '{name}' references unknown ordinal {ordinal}")
+        stages.append(item)
+    from spindlebox.validate import pipeline_edges
+    edges = pipe.edges or pipeline_edges(stages)
+    by_after: dict[int, list[dict]] = {}
+    for e in edges:
+        by_after.setdefault(e["after"], []).append(e)
+
+    out = dict(ctx)
+    prev_ordinal: int | None = None
+    for item in stages:
+        if prev_ordinal is not None:
+            for e in by_after.get(prev_ordinal, ()):
+                if e["from_key"] in out:
+                    out[e["to_key"]] = out[e["from_key"]]
+        out = call_item(index, root, item.address, out)
+        prev_ordinal = item.ordinal
+    return out

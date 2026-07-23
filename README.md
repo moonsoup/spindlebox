@@ -5,11 +5,11 @@ MIT licensed · [sponsor](https://github.com/sponsors/moonsoup)
 
 **The SPIndleframe indexer.** SPIndlebox empirically decomposes any codebase — Python,
 JavaScript/TypeScript, Go, Rust, Bash, Java — into an **SPI (Serialized Process Index)**: a
-nested, addressable, data-driven index of every function, so that:
+nested, addressable, data-driven index of every statically discoverable function, so that:
 
-1. **Nothing gets rebuilt that already exists** — `spindlebox search <concept> --all-projects`
+1. **Duplicate work surfaces before it happens** — `spindlebox search <concept> --all-projects`
    answers "do I already have this?" across every indexed repo (anti-bloat).
-2. **Migration to Rust (or any language) is mechanical** — the SPI carries normalized
+2. **Migration scaffolding to Rust (or any language) is mechanical** — the SPI carries normalized
    signatures, state-capture classification (Fn/FnMut/FnOnce), and a context-normalized
    calling convention; `spindlebox generate --lang rust` emits a compilable skeleton crate.
 
@@ -29,7 +29,8 @@ nested, addressable, data-driven index of every function, so that:
   are partitioned by signature class (`op_arrays`) — enforced by `spindlebox validate`.
 - **Named groups resembling class members**: packages/modules/classes form the group tree.
 - **Ordered pipelines**: `pipeline define` type-checks stage N → N+1 chains (direct return
-  → param, or through provided/required ctx keys).
+  → param, or through provided/required ctx keys), records explicit data-flow edges, and
+  `pipeline run` executes the chain with those edges applied.
 - **Independently callable items**: `spindlebox call <addr> --ctx '{...}'` invokes Python
   items through the normalized context.
 - **Compile-time validation**: schema conformance, array homogeneity, signature agreement,

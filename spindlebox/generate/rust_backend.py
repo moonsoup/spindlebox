@@ -328,8 +328,24 @@ class RustBackend(GeneratorBackend):
                 if not all(refs):
                     lines.append(f"// pipeline '{pipe.name}' skipped: stage(s) not generatable")
                     continue
+                # data-flow edges: without these a direct chain type-checks but
+                # never composes (stage N's result must move into stage N+1's key)
+                from spindlebox.validate import pipeline_edges
+                edges = pipe.edges or pipeline_edges(stages)
+                by_after = {}
+                for e in edges:
+                    by_after.setdefault(e["after"], []).append(e)
+                elems: list[str] = []
+                for stage, ref in zip(stages, refs, strict=True):
+                    elems.append(ref)
+                    for e in by_after.get(stage.ordinal, ()):
+                        src = ctx_fields.get(e["from_key"], _ident(e["from_key"]))
+                        dst = ctx_fields.get(e["to_key"], _ident(e["to_key"]))
+                        elems.append(
+                            "Box::new(move |__ctx: &mut crate::Ctx| { "
+                            f"__ctx.{dst} = __ctx.{src}.clone(); Ok(()) }})")
                 lines.append(f"pub fn pipeline_{_ident(pipe.name)}() -> Vec<crate::CtxOp> {{")
-                lines.append("    vec![" + ", ".join(refs) + "]")
+                lines.append("    vec![" + ", ".join(elems) + "]")
                 lines.append("}")
 
         cargo = "\n".join([

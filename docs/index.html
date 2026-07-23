@@ -195,8 +195,8 @@
   <p class="eyebrow">SPIndleframe · Serialized Process Index</p>
   <h1><span class="spin">Every function you own,</span> in one addressable index.</h1>
   <p class="sub">SPIndlebox empirically decomposes codebases — Python, TypeScript, Go,
-  Rust, Bash, Java — into an <b>SPI</b>: a typed, nested, data-driven index of every
-  function. So nothing gets rebuilt that already exists, and migrating to another
+  Rust, Bash, Java — into an <b>SPI</b>: a typed, nested, data-driven index of every statically
+  discoverable function. So nothing gets rebuilt that already exists, and migrating to another
   language becomes mechanical instead of heroic.</p>
   <div class="links">
     <a class="btn solid" href="https://github.com/moonsoup/spindlebox">GitHub</a>
@@ -245,7 +245,8 @@
       enforced by <span class="mono small">spindlebox validate</span>, like any good schema.</p></div>
     <div class="card"><b class="t">Typed pipelines</b>
       <p><span class="mono small">pipeline define</span> type-checks stage N → N+1 at
-      definition time. Broken chains are refused before they run.</p></div>
+      definition time; explicit data-flow edges carry each stage's result into
+      the next, and broken chains are refused before they run.</p></div>
   </div>
 </section>
 
@@ -361,6 +362,7 @@ spindlebox report typing-health</pre>
   SPIndlebox v1.0.0 · MIT ·
   <a href="https://github.com/moonsoup/spindlebox">github.com/moonsoup/spindlebox</a> ·
   <a href="https://github.com/moonsoup/spindlebox/blob/main/docs/REPORTING.md">reporting guide</a> ·
+  <a href="evidence/score-history.csv">evidence data</a> ·
   <a href="https://github.com/sponsors/moonsoup">sponsor</a>
 </footer>
 </main>

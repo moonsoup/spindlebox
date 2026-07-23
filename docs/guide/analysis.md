@@ -85,7 +85,7 @@ latent in the code's call graph and ctx contracts.
 type-checked pipeline verbatim:
 
     $ spindlebox pipeline define readpipe util.io.read_lines util.io.exists --project miniproj_py
-    pipeline 'readpipe' defined and type-checked (2 stages)
+    pipeline 'readpipe' defined and type-checked (2 stages, 0 data-flow edge(s))
 
 ### Exit codes
 

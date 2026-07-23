@@ -16,10 +16,44 @@ from spindlebox.schema import ScaIndex
 from spindlebox.sigclass import sig_class_id
 
 
+def pipeline_edges(stages: list) -> list[dict]:
+    """Explicit data-flow bindings for a stage chain.
+
+    A *direct* edge (stage N's return feeds stage N+1's sole required param)
+    only composes if the value actually moves between the two ctx keys —
+    the validator approving the chain is not enough (the double→triple
+    defect: both stages read the initial ctx and nothing flows). Each edge
+    is {'after': ordinal, 'from_key': ..., 'to_key': ...}: copy
+    ctx[from_key] → ctx[to_key] after that stage runs. Direct chaining
+    takes precedence over incidental ctx-key overlap, because an *ordered*
+    pipeline means stage N feeds stage N+1.
+    """
+    edges: list[dict] = []
+    for prev, cur in zip(stages, stages[1:], strict=False):
+        required = [p for p in cur.signature.params
+                    if p.kind not in ("receiver", "kwvariadic") and p.default is None]
+        direct = (len(required) == 1
+                  and required[0].norm_type == prev.signature.returns_norm)
+        from_key = prev.ctx_adapter.return_key
+        if not (direct and from_key):
+            continue
+        ctx_ref = cur.ctx_adapter.param_map.get(required[0].name,
+                                                f"ctx.{required[0].name}")
+        to_key = ctx_ref.removeprefix("ctx.")
+        if from_key != to_key:
+            edges.append({"after": prev.ordinal, "from_key": from_key,
+                          "to_key": to_key})
+    return edges
+
+
 def validate_index(index: ScaIndex, strict: bool = False) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
     by_ordinal = {}
+
+    for skipped in index.parse_errors:
+        msg = f"file skipped during indexing: {skipped}"
+        (errors if strict else warnings).append(msg)
 
     for item in index.items:
         if item.ordinal in by_ordinal:

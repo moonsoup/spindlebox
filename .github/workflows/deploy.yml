@@ -13,6 +13,9 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e ".[dev]"
+      # compile-check tests skip silently when toolchains are missing — assert
+      # they exist so cargo/javac verification can never quietly not run in CI
+      - run: cargo --version && javac -version
       - run: ruff check .
       - run: pytest -q
 

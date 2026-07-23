@@ -229,7 +229,8 @@
     "pipeline_open": "pub fn pipeline_${name}() -> Vec<crate::CtxOp> {",
     "pipeline_body": "    vec![${refs}]",
     "pipeline_close": "}",
-    "footer": []
+    "footer": [],
+    "pipeline_edge_op": "Box::new(move |__ctx: &mut crate::Ctx| { __ctx.${dst} = __ctx.${src}.clone(); Ok(()) })"
   },
   "files": [
     {

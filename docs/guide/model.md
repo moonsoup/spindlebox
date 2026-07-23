@@ -30,7 +30,7 @@ Compile-time validation pass over an index.
 **Routine check** — warnings are informational; the model holds:
 
     $ spindlebox validate --project miniproj_py
-    valid: 18 items, 6 warning(s)
+    valid: 20 items, 6 warning(s)
 
 (The warnings go to stderr and name each untyped item — `--verbose` on `index`
 shows the same list.)
@@ -72,6 +72,11 @@ generate but do not dispatch (there's no in-process runtime for them).
 
 ### Use cases
 
+`call` executes **Python module-level functions only** — methods, closures and
+lambdas are represented in the SPI but not callable, and other languages index
+and generate but never dispatch. Invoking imports the target module (its
+top-level code runs), so only `call` into projects you trust.
+
 **Smoke-test a pure function** — `a` and `b` route to params, the result lands
 under the item's `return_key`:
 
@@ -106,6 +111,7 @@ run.
 
     spindlebox pipeline define <name> <stage> [<stage> ...] [--project P]
     spindlebox pipeline check  <name> [--project P]
+    spindlebox pipeline run    <name> --ctx JSON [--project P]
     spindlebox pipeline list   [--project P]
 
 ### Options
@@ -119,10 +125,30 @@ run.
 ### Use cases
 
 **Define a two-stage chain** — accepted only if stage N's outputs satisfy stage
-N+1's inputs:
+N+1's inputs. Defining also computes the pipeline's **data-flow edges** — the
+explicit bindings that carry stage N's result into stage N+1's input key
+(a ctx-mediated chain needs none; a direct chain gets one):
 
     $ spindlebox pipeline define readpipe util.io.read_lines util.io.exists --project miniproj_py
-    pipeline 'readpipe' defined and type-checked (2 stages)
+    pipeline 'readpipe' defined and type-checked (2 stages, 0 data-flow edge(s))
+
+**Run a pipeline and watch data actually flow** — `double → triple` is a direct
+chain: the edge moves `double_result` into `x` between stages, so the answer is
+`triple(double(2)) = 12`, not two independent reads of the seed ctx:
+
+    $ spindlebox pipeline define chain pure.double pure.triple --project miniproj_py
+    pipeline 'chain' defined and type-checked (2 stages, 1 data-flow edge(s))
+
+    $ spindlebox pipeline run chain --ctx '{"x": 2}' --project miniproj_py
+    {
+     "x": 4,
+     "double_result": 4,
+     "triple_result": 12
+    }
+
+(`pipeline run` executes Python stages only, like `call`.) The generated Rust
+and Java pipelines emit the same edges as transfer ops, and a CI test fills the
+generated Rust stubs and executes the chain to assert the same 12.
 
 **See what's defined:**
 

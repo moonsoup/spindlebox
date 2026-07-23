@@ -31,13 +31,13 @@ folder — `ls -a`) and registers the project in `~/.spindlebox/registry.json`.
 **Index a project for the first time**
 
     $ spindlebox index miniproj_py --name miniproj_py
-    indexed miniproj_py: 18 items, 13 signature classes, 29 ctx keys, languages: python
+    indexed miniproj_py: 20 items, 13 signature classes, 29 ctx keys, languages: python
 
 **Re-index after edits** — ordinals are sticky: unchanged items keep their
 numbers, so saved selectors and pipelines survive.
 
     $ spindlebox index miniproj_py --name miniproj_py
-    indexed miniproj_py: 18 items, 13 signature classes, 29 ctx keys, languages: python
+    indexed miniproj_py: 20 items, 13 signature classes, 29 ctx keys, languages: python
 
 **Gate on typing quality** — with `--strict`, untyped (`any`) signatures fail
 the build (exit 1), which makes `index --strict` a CI typing gate.
@@ -46,6 +46,16 @@ the build (exit 1), which makes `index --strict` a CI typing gate.
 
 `0` indexed and valid · `1` validation errors (the index is still written and
 registered, so you can inspect what failed).
+
+### Files that fail to parse
+
+A file with a syntax error is **skipped, not fatal**: indexing continues, the
+skip is printed to stderr, and — so an index can never silently pass as
+complete — every skipped file is recorded in the SPI itself
+(`parse_errors`). `validate` warns about them; `validate --strict` (and
+`index --strict`) fails on them. The index covers every *statically
+discoverable* declaration; code produced at runtime (eval, metaprogramming,
+decorator replacement) is inherently out of scope for a static parser.
 
 ### See also
 
@@ -91,8 +101,8 @@ Show items by ordinal range, address, or group path, with filters.
 **Walk one module** by group path:
 
     $ spindlebox show util.io --project miniproj_py
-       12  util.io.read_lines  sig:str->list<str>  [python/function/pure→fn]  — Read lines from a file.
-       13  util.io.exists  sig:str->bool  [python/function/pure→fn]  — Check whether a path exists.
+       14  util.io.read_lines  sig:str->list<str>  [python/function/pure→fn]  — Read lines from a file.
+       15  util.io.exists  sig:str->bool  [python/function/pure→fn]  — Check whether a path exists.
     ...
 
 **Find every implementation of one shape** — the cross-language payoff: the same
@@ -180,7 +190,7 @@ on it.
 normalized ctx contract:
 
     $ spindlebox deps util.io.read_lines --project miniproj_py
-       12  util.io.read_lines  sig:str->list<str>  [python/function/pure→fn]  — Read lines from a file.
+       14  util.io.read_lines  sig:str->list<str>  [python/function/pure→fn]  — Read lines from a file.
       imports: json, os, requests
       external packages: requests
       env vars: -
@@ -193,7 +203,7 @@ normalized ctx contract:
     $ spindlebox deps util.io.read_lines --project miniproj_py --reverse
     callers of util.io.read_lines:
         4  app.make_reader.read  sig:str->list<str>  [python/closure/reads_captured→Fn]
-       16  util.io.Reader.read  sig:->list<str>  [python/method/mutates_instance→FnMut]
+       18  util.io.Reader.read  sig:->list<str>  [python/method/mutates_instance→FnMut]
 
 ### Exit codes
 
