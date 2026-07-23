@@ -2,19 +2,90 @@
   "language": "rust",
   "ident": {
     "keywords": [
-      "as", "async", "await", "box", "break", "const", "continue", "crate", "dyn",
-      "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let",
-      "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "static",
-      "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while",
-      "abstract", "become", "do", "final", "macro", "override", "priv", "try",
-      "typeof", "unsized", "virtual", "yield", "union"
+      "as",
+      "async",
+      "await",
+      "box",
+      "break",
+      "const",
+      "continue",
+      "crate",
+      "dyn",
+      "else",
+      "enum",
+      "extern",
+      "false",
+      "fn",
+      "for",
+      "if",
+      "impl",
+      "in",
+      "let",
+      "loop",
+      "match",
+      "mod",
+      "move",
+      "mut",
+      "pub",
+      "ref",
+      "return",
+      "static",
+      "struct",
+      "super",
+      "trait",
+      "true",
+      "type",
+      "unsafe",
+      "use",
+      "where",
+      "while",
+      "abstract",
+      "become",
+      "do",
+      "final",
+      "macro",
+      "override",
+      "priv",
+      "try",
+      "typeof",
+      "unsized",
+      "virtual",
+      "yield",
+      "union"
     ],
-    "no_raw": ["self", "Self", "super", "crate"],
-    "remap": {"_": "blank", "": "field"},
-    "escape": {"style": "prefix", "with": "r#"},
+    "no_raw": [
+      "self",
+      "Self",
+      "super",
+      "crate"
+    ],
+    "remap": {
+      "_": "blank",
+      "": "field"
+    },
+    "escape": {
+      "style": "prefix",
+      "with": "r#"
+    },
     "reserved_type_names": [
-      "Vec", "String", "Option", "Result", "Box", "Rc", "Arc", "HashMap", "HashSet",
-      "BTreeMap", "BTreeSet", "Cow", "Cell", "RefCell", "Some", "None", "Ok", "Err"
+      "Vec",
+      "String",
+      "Option",
+      "Result",
+      "Box",
+      "Rc",
+      "Arc",
+      "HashMap",
+      "HashSet",
+      "BTreeMap",
+      "BTreeSet",
+      "Cow",
+      "Cell",
+      "RefCell",
+      "Some",
+      "None",
+      "Ok",
+      "Err"
     ],
     "reserve_root_name": false,
     "reserve_alias_names": false
@@ -22,18 +93,49 @@
   "types": {
     "strip_leading": "*",
     "simple": {
-      "str": "String", "bytes": "Vec<u8>", "bool": "bool", "i64": "i64",
-      "f64": "f64", "unit": "()", "any": "serde_json::Value", "error": "String",
+      "str": "String",
+      "bytes": "Vec<u8>",
+      "bool": "bool",
+      "i64": "i64",
+      "f64": "f64",
+      "unit": "()",
+      "any": "serde_json::Value",
+      "error": "String",
       "fn": "serde_json::Value"
     },
     "containers": {
-      "list": {"format": "Vec<{0}>"},
-      "iter": {"format": "Vec<{0}>"},
-      "map": {"format": "std::collections::HashMap<{0}, {1}>", "defaults": ["any", "any"]},
-      "set": {"format": "std::collections::HashSet<{0}>"},
-      "option": {"format": "Option<{0}>"},
-      "result": {"format": "Result<{0}, {1}>", "defaults": ["any", "error"]},
-      "tuple": {"variadic": true, "format": "({args})", "join": ", ", "empty": "()"}
+      "list": {
+        "format": "Vec<{0}>"
+      },
+      "iter": {
+        "format": "Vec<{0}>"
+      },
+      "map": {
+        "format": "std::collections::HashMap<{0}, {1}>",
+        "defaults": [
+          "any",
+          "any"
+        ]
+      },
+      "set": {
+        "format": "std::collections::HashSet<{0}>"
+      },
+      "option": {
+        "format": "Option<{0}>"
+      },
+      "result": {
+        "format": "Result<{0}, {1}>",
+        "defaults": [
+          "any",
+          "error"
+        ]
+      },
+      "tuple": {
+        "variadic": true,
+        "format": "({args})",
+        "join": ", ",
+        "empty": "()"
+      }
     },
     "fallback": "serde_json::Value"
   },
@@ -65,18 +167,27 @@
     "alias_param": "${type}",
     "alias_ret": " -> ${type}",
     "alias_ret_unit": "",
-    "sig_alias": ["// ${sig_id}", "pub type ${alias} = Box<dyn Fn(${params})${ret}>;"],
-    "after_aliases": [""],
+    "sig_alias": [
+      "// ${sig_id}",
+      "pub type ${alias} = Box<dyn Fn(${params})${ret}>;"
+    ],
+    "after_aliases": [
+      ""
+    ],
     "doc_suffix": " — ${doc}",
     "item_doc": "${indent}/// [${ordinal}] ${address} (${file}:${start}-${end}, ${language}, ${state}→${trait})${docsuffix}",
     "item_doc_internal": "${indent}// [${ordinal}] ${address} (${file}:${start}-${end}, ${language}, ${state}→${trait})${docsuffix}",
-    "internal_note": ["${indent}// internal item (${kind}) — not generated as a free fn"],
+    "internal_note": [
+      "${indent}// internal item (${kind}) — not generated as a free fn"
+    ],
     "receiver_param": "recv: &mut serde_json::Value",
     "param": "${ident}: ${type}",
     "skeleton_ret": " -> ${type}",
     "skeleton_ret_unit": "",
     "skeleton_open": "${indent}pub fn ${name}(${params})${ret} {",
-    "skeleton_body": ["${indent}    todo!()"],
+    "skeleton_body": [
+      "${indent}    todo!()"
+    ],
     "skeleton_close": "${indent}}",
     "wrapper_open": [
       "",
@@ -90,19 +201,30 @@
       "${indent}        let ${var} = __ctx.${field}.clone().unwrap_or_default();"
     ],
     "blank_arg": "Default::default()",
-    "call": "${indent}        let result = self::${name}(${args});",
-    "store": "${indent}        __ctx.${rk} = Some(result);",
-    "discard": ["${indent}        let _ = result;"],
-    "wrapper_close": ["${indent}        Ok(())", "${indent}    })", "${indent}}"],
+    "call": "${indent}        let ${result} = self::${name}(${args});",
+    "store": "${indent}        __ctx.${rk} = Some(${result});",
+    "discard": [
+      "${indent}        let _ = ${result};"
+    ],
+    "wrapper_close": [
+      "${indent}        Ok(())",
+      "${indent}    })",
+      "${indent}}"
+    ],
     "op_ref": "crate::${mod_path}::${name}_op()",
     "module_open": "${indent}pub mod ${name} {",
     "module_close": "${indent}}",
-    "arrays_header": ["// ---- operation groups (arrays partitioned by signature) ----"],
+    "arrays_header": [
+      "// ---- operation groups (arrays partitioned by signature) ----"
+    ],
     "array_comment": "// ${sig_id} — members: ${members}",
     "array_open": "pub fn ${name}() -> Vec<crate::CtxOp> {",
     "array_body": "    vec![${refs}]",
     "array_close": "}",
-    "pipelines_header": ["", "// ---- ordered pipelines ----"],
+    "pipelines_header": [
+      "",
+      "// ---- ordered pipelines ----"
+    ],
     "pipeline_skip": "// pipeline '${name}' skipped: stage(s) not generatable",
     "pipeline_open": "pub fn pipeline_${name}() -> Vec<crate::CtxOp> {",
     "pipeline_body": "    vec![${refs}]",
@@ -123,6 +245,9 @@
         "serde_json = \"1\""
       ]
     },
-    {"kind": "main", "path": "src/lib.rs"}
+    {
+      "kind": "main",
+      "path": "src/lib.rs"
+    }
   ]
 }

@@ -57,10 +57,26 @@ def _javac(files, tmp_path):
 @pytest.mark.skipif(shutil.which("javac") is None, reason="javac not installed")
 @pytest.mark.parametrize("project", [
     "miniproj_mixed", "miniproj_py", "miniproj_go", "miniproj_rust", "miniproj_java",
+    "miniproj_edge",
 ])
 def test_javac_check(project, tmp_path):
     proc = _javac(gen(project), tmp_path)
     assert proc.returncode == 0, proc.stderr
+
+
+def test_result_param_binding_disambiguated():
+    """slamface #11 (flask): a source param named 'result' redeclared the
+    wrapper's local in Java (no let-shadowing)."""
+    src = gen("miniproj_edge")["Miniproj_edge.java"]
+    assert "var result_2 = Miniproj_edge.edge.process(result);" in src
+
+
+def test_object_member_names_escaped():
+    """slamface #12 (click): a static 'clone()' illegally hides Object.clone()."""
+    src = gen("miniproj_edge")["Miniproj_edge.java"]
+    assert "public static String clone_()" in src
+    assert "public static String toString_(" in src
+    assert "public static String clone()" not in src
 
 
 @pytest.mark.skipif(shutil.which("javac") is None, reason="javac not installed")

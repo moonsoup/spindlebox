@@ -50,6 +50,12 @@ class EmitProfile:
         self.reserve_aliases = bool(ident.get("reserve_alias_names"))
         # e.g. Java: a nested class may not share the simple name of any enclosing class
         self.reserve_ancestors = bool(ident.get("reserve_ancestor_names"))
+        # e.g. Java: a static member may not hide an Object instance method
+        # (clone, toString, …) — escape these item names like keywords
+        self.reserved_members = set(ident.get("reserved_member_names", []))
+        # e.g. Java: no let-shadowing — the wrapper's result binding must not
+        # collide with a source param named 'result'
+        self.unique_result = bool(ident.get("unique_result_binding"))
         self.types = data["types"]
         self.t = data["templates"]
         self.files = data["files"]
@@ -199,6 +205,8 @@ class ProfileBackend(GeneratorBackend):
         def emit_item(item: Item, indent: str, used: set[str]) -> list[str]:
             out: list[str] = []
             name = p.ident(item.name)
+            if name in p.reserved_members:
+                name = name + (p.escape["with"] if p.escape["style"] == "suffix" else "_")
             if name in used:
                 name = f"{name}_o{item.ordinal}"
             used.add(name)
@@ -264,17 +272,24 @@ class ProfileBackend(GeneratorBackend):
                                     type=p.render_type(q.norm_type), **wvars)
                     call_args.append(var)
                 args_s = ", ".join(call_args)
+                result_var = "result"
+                if p.unique_result:
+                    n = 2
+                    while result_var in seen_p:
+                        result_var = f"result_{n}"
+                        n += 1
                 if is_unit and "call_void" in T:
                     out.append(_sub(T["call_void"], args=args_s, **wvars))
                 else:
-                    out.append(_sub(T["call"], args=args_s, **wvars))
+                    out.append(_sub(T["call"], args=args_s, result=result_var, **wvars))
                     rk_key = item.ctx_adapter.return_key
                     if rk_key:
                         rk = ctx_fields.get(rk_key, p.ident(rk_key))
                         rktype = p.render_type(index.ctx_schema.get(rk_key, "any"))
-                        out.append(_sub(T["store"], rk=rk, rktype=rktype, **wvars))
+                        out.append(_sub(T["store"], rk=rk, rktype=rktype,
+                                        result=result_var, **wvars))
                     else:
-                        out += _sub_all(T["discard"], **wvars)
+                        out += _sub_all(T["discard"], result=result_var, **wvars)
                 out += _sub_all(T["wrapper_close"], **wvars)
                 generated_ops.append((_sub(T["op_ref"], **wvars), item.address))
             return out

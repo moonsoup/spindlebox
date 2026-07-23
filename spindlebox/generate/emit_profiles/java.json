@@ -2,41 +2,150 @@
   "language": "java",
   "ident": {
     "keywords": [
-      "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char",
-      "class", "const", "continue", "default", "do", "double", "else", "enum",
-      "extends", "final", "finally", "float", "for", "goto", "if", "implements",
-      "import", "instanceof", "int", "interface", "long", "native", "new",
-      "package", "private", "protected", "public", "return", "short", "static",
-      "strictfp", "super", "switch", "synchronized", "this", "throw", "throws",
-      "transient", "try", "void", "volatile", "while", "true", "false", "null",
-      "var", "record", "yield", "sealed", "permits", "non"
+      "abstract",
+      "assert",
+      "boolean",
+      "break",
+      "byte",
+      "case",
+      "catch",
+      "char",
+      "class",
+      "const",
+      "continue",
+      "default",
+      "do",
+      "double",
+      "else",
+      "enum",
+      "extends",
+      "final",
+      "finally",
+      "float",
+      "for",
+      "goto",
+      "if",
+      "implements",
+      "import",
+      "instanceof",
+      "int",
+      "interface",
+      "long",
+      "native",
+      "new",
+      "package",
+      "private",
+      "protected",
+      "public",
+      "return",
+      "short",
+      "static",
+      "strictfp",
+      "super",
+      "switch",
+      "synchronized",
+      "this",
+      "throw",
+      "throws",
+      "transient",
+      "try",
+      "void",
+      "volatile",
+      "while",
+      "true",
+      "false",
+      "null",
+      "var",
+      "record",
+      "yield",
+      "sealed",
+      "permits",
+      "non"
     ],
     "no_raw": [],
-    "remap": {"_": "blank", "": "field"},
-    "escape": {"style": "suffix", "with": "_"},
+    "remap": {
+      "_": "blank",
+      "": "field"
+    },
+    "escape": {
+      "style": "suffix",
+      "with": "_"
+    },
     "reserved_type_names": [
-      "java", "javax", "String", "Object", "Integer", "Long", "Double", "Boolean",
-      "Void", "Ctx", "CtxOp", "OpError"
+      "java",
+      "javax",
+      "String",
+      "Object",
+      "Integer",
+      "Long",
+      "Double",
+      "Boolean",
+      "Void",
+      "Ctx",
+      "CtxOp",
+      "OpError"
     ],
     "reserve_root_name": true,
     "reserve_alias_names": true,
-    "reserve_ancestor_names": true
+    "reserve_ancestor_names": true,
+    "reserved_member_names": [
+      "clone",
+      "equals",
+      "finalize",
+      "getClass",
+      "hashCode",
+      "notify",
+      "notifyAll",
+      "toString",
+      "wait"
+    ],
+    "unique_result_binding": true
   },
   "types": {
     "strip_leading": "*",
     "simple": {
-      "str": "String", "bytes": "byte[]", "bool": "Boolean", "i64": "Long",
-      "f64": "Double", "unit": "Void", "any": "Object", "error": "String",
+      "str": "String",
+      "bytes": "byte[]",
+      "bool": "Boolean",
+      "i64": "Long",
+      "f64": "Double",
+      "unit": "Void",
+      "any": "Object",
+      "error": "String",
       "fn": "Object"
     },
     "containers": {
-      "list": {"format": "java.util.List<{0}>"},
-      "iter": {"format": "java.util.List<{0}>"},
-      "map": {"format": "java.util.Map<{0}, {1}>", "defaults": ["any", "any"]},
-      "set": {"format": "java.util.Set<{0}>"},
-      "option": {"format": "java.util.Optional<{0}>"},
-      "result": {"format": "{0}", "defaults": ["any"]},
-      "tuple": {"variadic": true, "format": "Object[]", "join": ", ", "empty": "Object[]"}
+      "list": {
+        "format": "java.util.List<{0}>"
+      },
+      "iter": {
+        "format": "java.util.List<{0}>"
+      },
+      "map": {
+        "format": "java.util.Map<{0}, {1}>",
+        "defaults": [
+          "any",
+          "any"
+        ]
+      },
+      "set": {
+        "format": "java.util.Set<{0}>"
+      },
+      "option": {
+        "format": "java.util.Optional<{0}>"
+      },
+      "result": {
+        "format": "{0}",
+        "defaults": [
+          "any"
+        ]
+      },
+      "tuple": {
+        "variadic": true,
+        "format": "Object[]",
+        "join": ", ",
+        "empty": "Object[]"
+      }
     },
     "fallback": "Object"
   },
@@ -66,19 +175,30 @@
     "alias_param": "${type} p${i}",
     "alias_ret": "${type}",
     "alias_ret_unit": "void",
-    "sig_alias": ["    // ${sig_id}", "    public interface ${alias} { ${ret} call(${params}); }"],
-    "after_aliases": [""],
+    "sig_alias": [
+      "    // ${sig_id}",
+      "    public interface ${alias} { ${ret} call(${params}); }"
+    ],
+    "after_aliases": [
+      ""
+    ],
     "doc_suffix": " — ${doc}",
-    "doc_escape": {"*/": "* /"},
+    "doc_escape": {
+      "*/": "* /"
+    },
     "item_doc": "${indent}/** [${ordinal}] ${address} (${file}:${start}-${end}, ${language}, ${state}→${trait})${docsuffix} */",
     "item_doc_internal": "${indent}// [${ordinal}] ${address} (${file}:${start}-${end}, ${language}, ${state}→${trait})${docsuffix}",
-    "internal_note": ["${indent}// internal item (${kind}) — not generated as a method"],
+    "internal_note": [
+      "${indent}// internal item (${kind}) — not generated as a method"
+    ],
     "receiver_param": "Object recv",
     "param": "${type} ${ident}",
     "skeleton_ret": "${type}",
     "skeleton_ret_unit": "void",
     "skeleton_open": "${indent}public static ${ret} ${name}(${params}) {",
-    "skeleton_body": ["${indent}    throw new UnsupportedOperationException(\"TODO\");"],
+    "skeleton_body": [
+      "${indent}    throw new UnsupportedOperationException(\"TODO\");"
+    ],
     "skeleton_close": "${indent}}",
     "wrapper_open": [
       "",
@@ -93,27 +213,40 @@
       "${indent}        ${type} ${var} = (${type}) (Object) __ctx.${field};"
     ],
     "blank_arg": "null",
-    "call": "${indent}        var result = ${root}.${mod_path}.${name}(${args});",
+    "call": "${indent}        var ${result} = ${root}.${mod_path}.${name}(${args});",
     "call_void": "${indent}        ${root}.${mod_path}.${name}(${args});",
-    "store": "${indent}        __ctx.${rk} = (${rktype}) (Object) result;",
+    "store": "${indent}        __ctx.${rk} = (${rktype}) (Object) ${result};",
     "discard": [],
-    "wrapper_close": ["${indent}    };", "${indent}}"],
+    "wrapper_close": [
+      "${indent}    };",
+      "${indent}}"
+    ],
     "op_ref": "${root}.${mod_path}.${name}_op()",
     "module_open": "${indent}public static class ${name} {",
     "module_close": "${indent}}",
-    "arrays_header": ["    // ---- operation groups (arrays partitioned by signature) ----"],
+    "arrays_header": [
+      "    // ---- operation groups (arrays partitioned by signature) ----"
+    ],
     "array_comment": "    // ${sig_id} — members: ${members}",
     "array_open": "    public static java.util.List<CtxOp> ${name}() {",
     "array_body": "        return java.util.List.of(${refs});",
     "array_close": "    }",
-    "pipelines_header": ["", "    // ---- ordered pipelines ----"],
+    "pipelines_header": [
+      "",
+      "    // ---- ordered pipelines ----"
+    ],
     "pipeline_skip": "    // pipeline '${name}' skipped: stage(s) not generatable",
     "pipeline_open": "    public static java.util.List<CtxOp> pipeline_${name}() {",
     "pipeline_body": "        return java.util.List.of(${refs});",
     "pipeline_close": "    }",
-    "footer": ["}"]
+    "footer": [
+      "}"
+    ]
   },
   "files": [
-    {"kind": "main", "path": "${root}.java"}
+    {
+      "kind": "main",
+      "path": "${root}.java"
+    }
   ]
 }
