@@ -32,3 +32,14 @@ export const home = (): string => process.env.APP_HOME ?? "";
 export function fetchIt(url: string): Promise<string> {
   return axios.get(url).then((r: any) => r.data);
 }
+
+export function* pages(n: number): Generator<number> {
+  let i = 0;
+  while (i < n) { yield i; i++; }
+}
+export const genExpr = function* (s: string) { yield s; };
+export function reset(flag: boolean): boolean {
+  let state = true;
+  state = flag;
+  return state;
+}

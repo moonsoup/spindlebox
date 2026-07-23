@@ -34,8 +34,9 @@ def test_env_var(idx):
 
 
 def test_mutating_closure(idx):
-    closures = [i for i in idx.items if i.kind == "closure"]
-    assert closures, "no closures extracted"
+    closures = [i for i in idx.items
+                if i.kind == "closure" and "MakeCounter" in i.address]
+    assert closures, "no closure extracted inside MakeCounter"
     assert closures[0].state_capture == "mutates_captured"
 
 

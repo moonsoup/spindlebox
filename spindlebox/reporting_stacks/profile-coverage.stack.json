@@ -1,0 +1,7 @@
+{
+  "report": "profile-coverage",
+  "description": "Which declared language-profile constructs the fixtures exercise",
+  "stages": ["collect.profile_coverage", "render.table"],
+  "ctx": {"fixture_root": "tests/fixtures"},
+  "default_format": "md"
+}

@@ -39,3 +39,14 @@ type Reader struct {
 func (r *Reader) Read() []string {
 	return ReadLines(r.path)
 }
+
+// Tally covers variadic, var, range, plain assignment, and decrement.
+func Tally(nums ...int) int {
+	var total int
+	for _, n := range nums {
+		total = total + n
+	}
+	counter := 10
+	counter--
+	return total + counter
+}

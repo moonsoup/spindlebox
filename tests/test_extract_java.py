@@ -44,8 +44,9 @@ def test_varargs_and_instance_mutation(idx):
 
 
 def test_lambda_reads_captured_local(idx):
-    lambdas = [i for i in idx.items if i.kind == "lambda"]
-    assert lambdas, "no lambdas extracted"
+    lambdas = [i for i in idx.items
+               if i.kind == "lambda" and "measure" in i.address]
+    assert lambdas, "no lambda extracted inside measure"
     assert lambdas[0].state_capture == "reads_captured"
 
 

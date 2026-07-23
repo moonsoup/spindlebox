@@ -31,3 +31,11 @@ function makeTicker() {
 }
 
 module.exports = { readLines, slugify, tally, api, makeTicker };
+
+class Store {
+  constructor() { this.items = []; }
+  add(item) { this.items.push(item); }
+}
+const Registry = class { get(k) { return k; } };
+function* idGen() { let i = 0; while (true) yield i++; }
+const pager = function* (n) { yield n; };

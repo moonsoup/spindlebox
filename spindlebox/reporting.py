@@ -186,6 +186,59 @@ def collect_score_history(ctx):
     return ctx
 
 
+@report_op("collect.profile_coverage", requires=set(), provides={"title", "columns", "rows"})
+def collect_profile_coverage(ctx):
+    """Which profile-declared node types the fixture corpus actually exercises.
+
+    A declared-but-never-parsed node type means a differential/extraction path
+    no test has ever run — the exact gap that let the javascript profile go
+    untested until a real .js fixture existed.
+    """
+    from spindlebox.extract.base import EXT_MAP
+    from spindlebox.extract.profile_registry import all_profiles
+    from spindlebox.extract.ts_util import parse
+
+    fixture_root = Path(ctx.get("fixture_root", "tests/fixtures"))
+    rows = []
+    for lang, prof in sorted(all_profiles().items()):
+        if not prof.walker:
+            continue
+        declared: set[str] = set(prof.declarations) | set(prof.containers)
+        declared |= set(prof.params.get("nodes", {})) | set(prof.declare.get("nodes", {}))
+        declared |= set(prof.writes.get("assign", ())) | set(prof.writes.get("update", ()))
+        if prof.calls.get("node"):
+            declared.add(prof.calls["node"])
+        declared |= {r["node"] for r in prof.imports}
+
+        files = [p for p in sorted(fixture_root.rglob("*"))
+                 if p.is_file() and EXT_MAP.get(p.suffix.lower()) == lang
+                 and ".spi" not in p.parts]
+        observed: set[str] = set()
+        grammar = prof.grammar or {}
+        for f in files:
+            gname = grammar.get("name", lang)
+            for suffix, alt in grammar.get("by_suffix", {}).items():
+                if f.name.endswith(suffix):
+                    gname = alt
+            stack = [parse(gname, f.read_text(errors="replace")).root_node]
+            while stack:
+                n = stack.pop()
+                observed.add(n.type)
+                stack.extend(n.children)
+        missing = sorted(declared - observed)
+        rows.append({
+            "language": lang,
+            "fixture_files": len(files),
+            "declared": len(declared),
+            "exercised": len(declared) - len(missing),
+            "missing": ", ".join(missing) or "—",
+        })
+    ctx.update(title="Profile coverage — declared node types vs fixture corpus",
+               columns=["language", "fixture_files", "declared", "exercised", "missing"],
+               rows=rows)
+    return ctx
+
+
 # --------------------------------------------------------------- renderers
 
 def _cell(v) -> str:

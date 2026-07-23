@@ -25,3 +25,9 @@ pub fn outer(r#type: String) -> String {
     }
     helper(r#type)
 }
+
+pub fn reassign(mut x: i64) -> i64 {
+    let y = 5;
+    x = y + x;
+    x
+}
