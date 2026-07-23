@@ -22,6 +22,7 @@ Go in, Rust out. Output languages are defined by emit profiles
 | `--lang` | `rust` \| `java` | required | output backend |
 | `--out` | directory | `generated_<lang>/` in cwd | where files land |
 | `--group` | group path | whole index | restrict to one group subtree |
+| `--pretty` | flag | off | expand bodies onto multiple lines (default: one spindle, one line) |
 | `--project` | name | index at/above cwd | registered project |
 
 ### Use cases
@@ -40,6 +41,21 @@ skeleton and a ctx wrapper per function, op arrays, and any defined pipelines:
     wrote gen_demo/Miniproj_py.java
 
 **Port one subsystem** — `--group util.io` emits only that subtree.
+
+### Structure of the output
+
+- **One spindle, one line.** Skeletons, wrappers, op arrays and pipelines each
+  emit as a single (long, spindly) line; `--pretty` expands bodies for human
+  editing. Blank lines never run more than one deep — whitespace in the output
+  is cosmetic and carries no meaning in any target language.
+- **`master_spindle()`** — the orchestration root: one function listing every
+  op array and pipeline **in load order** (sets first, then pipelines), so a
+  generated application has a single authoritative answer to "what runs, in
+  what order."
+- **`spindle_trace`** — a built-in workflow tracker on `Ctx`: every wrapper
+  records its item address as it executes, and every pipeline edge records its
+  transfer, so after running any chain the ctx carries the exact path taken
+  (e.g. `["app.double", "edge double_result->x", "app.triple"]`).
 
 ### What the output is — and isn't
 

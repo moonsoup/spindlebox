@@ -230,7 +230,21 @@
     "pipeline_body": "    vec![${refs}]",
     "pipeline_close": "}",
     "footer": [],
-    "pipeline_edge_op": "Box::new(move |__ctx: &mut crate::Ctx| { __ctx.${dst} = __ctx.${src}.clone(); Ok(()) })"
+    "pipeline_edge_op": "Box::new(move |__ctx: &mut crate::Ctx| { __ctx.spindle_trace.push(\"edge ${src}->${dst}\".to_string()); __ctx.${dst} = __ctx.${src}.clone(); Ok(()) })",
+    "ctx_trace_field": "    pub spindle_trace: Vec<String>,",
+    "wrapper_trace": "${indent}        __ctx.spindle_trace.push(\"${address}\".to_string());",
+    "master_header": [
+      "// ---- master spindle: load order of every set and pipeline ----"
+    ],
+    "master_open": [
+      "pub fn master_spindle() -> Vec<(&'static str, Vec<crate::CtxOp>)> {",
+      "    vec!["
+    ],
+    "master_entry": "        (\"${name}\", crate::${name}()),",
+    "master_close": [
+      "    ]",
+      "}"
+    ]
   },
   "files": [
     {

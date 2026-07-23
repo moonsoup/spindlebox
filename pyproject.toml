@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spindlebox"
-version = "1.1.0"
+version = "1.2.0"
 description = "SPIndlebox: the SPIndleframe architecture indexer - empirical Serialized Process Index (SPI), dependency map, and skeleton generator for any codebase."
 requires-python = ">=3.11"
 dependencies = [

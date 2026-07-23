@@ -359,7 +359,7 @@ def cmd_generate(args) -> int:
         raise CliError(f"no generator backend for '{args.lang}' (have: {sorted(BACKENDS)})")
     idx, _root = _load_project(args)
     out_dir = Path(args.out or f"generated_{args.lang}")
-    files = backend_cls().generate(idx, GenOptions(group=args.group))
+    files = backend_cls().generate(idx, GenOptions(group=args.group, pretty=args.pretty))
     for f in files:
         target = out_dir / f.relpath
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -517,6 +517,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lang", required=True)
     p.add_argument("--out")
     p.add_argument("--group", help="restrict to one group path")
+    p.add_argument("--pretty", action="store_true",
+                   help="expand bodies onto multiple lines (default: one line per spindle)")
     _add_project_arg(p)
     p.set_defaults(func=cmd_generate)
 

@@ -20,7 +20,13 @@ import re
 from pathlib import Path
 from string import Template
 
-from spindlebox.generate.base import GeneratedFile, GeneratorBackend, GenOptions
+from spindlebox.generate.base import (
+    GeneratedFile,
+    GeneratorBackend,
+    GenOptions,
+    flatten_block,
+    squeeze_blanks,
+)
 from spindlebox.generate.rust_backend import _split_top
 from spindlebox.schema import Group, Item, ScaIndex
 
@@ -167,9 +173,10 @@ class ProfileBackend(GeneratorBackend):
 
         lines = _sub_all(T["header"], **gvars)
 
-        # injective ctx-key → field-ident map (same construction as rust_backend)
+        # injective ctx-key → field-ident map (same construction as rust_backend);
+        # spindle_trace is reserved for the built-in workflow tracker
         ctx_fields: dict[str, str] = {}
-        used_fields: set[str] = set()
+        used_fields: set[str] = {"spindle_trace"}
         for key in sorted(index.ctx_schema):
             base = p.ident(key)
             ident = base
@@ -182,6 +189,7 @@ class ProfileBackend(GeneratorBackend):
         for key in sorted(index.ctx_schema):
             lines.append(_sub(T["ctx_field"], field=ctx_fields[key],
                               type=p.render_type(index.ctx_schema[key]), **gvars))
+        lines.append(_sub(T["ctx_trace_field"], **gvars))
         lines += _sub_all(T["after_ctx"], **gvars)
 
         for sig_id in sorted(index.signature_classes):
@@ -251,13 +259,18 @@ class ProfileBackend(GeneratorBackend):
             is_unit = ret == "unit"
             ret_s = T["skeleton_ret_unit"] if is_unit else \
                 _sub(T["skeleton_ret"], type=p.render_type(ret))
-            out.append(_sub(T["skeleton_open"], params=", ".join(params), ret=ret_s, **ivars))
-            out += _sub_all(T["skeleton_body"], **ivars)
-            out.append(_sub(T["skeleton_close"], **ivars))
+            skeleton = [_sub(T["skeleton_open"], params=", ".join(params), ret=ret_s, **ivars)]
+            skeleton += _sub_all(T["skeleton_body"], **ivars)
+            skeleton.append(_sub(T["skeleton_close"], **ivars))
+            out.extend(skeleton if options.pretty else flatten_block(skeleton))
             if item.kind == "function":
                 mod_path = module_sep.join(p.mod_path_segs(item.group, extra_reserved))
                 wvars = {**ivars, "mod_path": mod_path}
-                out += _sub_all(T["wrapper_open"], **wvars)
+                opened = _sub_all(T["wrapper_open"], **wvars)
+                sep, wrapper = (opened[0], opened[1:]) if opened and opened[0] == "" \
+                    else ("", opened)
+                wrapper.append(_sub(T["wrapper_trace"], **wvars))
+                out, real_out = wrapper, out
                 call_args = []
                 for q, var in zip(sig_params, pidents, strict=True):
                     if q.name == "_" or set(q.name) <= {"_"}:
@@ -291,10 +304,18 @@ class ProfileBackend(GeneratorBackend):
                     else:
                         out += _sub_all(T["discard"], result=result_var, **wvars)
                 out += _sub_all(T["wrapper_close"], **wvars)
+                out, wrapper = real_out, out
+                if options.pretty:
+                    if sep == "":
+                        out.append("")
+                    out.extend(wrapper)
+                else:
+                    out.extend(flatten_block(wrapper))
                 generated_ops.append((_sub(T["op_ref"], **wvars), item.address))
             return out
 
         op_arrays: list[str] = []
+        set_names: list[str] = []  # load order for the master spindle
 
         def emit_group(group: Group, indent: str, ancestors: tuple[str, ...] = ()) -> list[str]:
             out: list[str] = []
@@ -322,11 +343,13 @@ class ProfileBackend(GeneratorBackend):
                 if not refs:
                     continue
                 arr_name = p.ident(f"ops_{group.path.replace('.', '_')}_{n}")
+                set_names.append(arr_name)
                 op_arrays.append(_sub(T["array_comment"], sig_id=sig_id,
                                       members=", ".join(m.address for m in members), **gvars))
-                op_arrays.append(_sub(T["array_open"], name=arr_name, **gvars))
-                op_arrays.append(_sub(T["array_body"], refs=", ".join(refs), **gvars))
-                op_arrays.append(_sub(T["array_close"], **gvars))
+                block = [_sub(T["array_open"], name=arr_name, **gvars),
+                         _sub(T["array_body"], refs=", ".join(refs), **gvars),
+                         _sub(T["array_close"], **gvars)]
+                op_arrays.extend(block if options.pretty else flatten_block(block))
             return out
 
         for root_group in index.groups:
@@ -360,10 +383,20 @@ class ProfileBackend(GeneratorBackend):
                             dst=ctx_fields.get(e["to_key"], p.ident(e["to_key"])),
                             dsttype=p.render_type(index.ctx_schema.get(e["to_key"], "any")),
                             **gvars))
-                lines.append(_sub(T["pipeline_open"], name=p.ident(pipe.name), **gvars))
-                lines.append(_sub(T["pipeline_body"], refs=", ".join(elems), **gvars))
-                lines.append(_sub(T["pipeline_close"], **gvars))
+                pipe_fn = "pipeline_" + p.ident(pipe.name)
+                set_names.append(pipe_fn)
+                block = [_sub(T["pipeline_open"], name=p.ident(pipe.name), **gvars),
+                         _sub(T["pipeline_body"], refs=", ".join(elems), **gvars),
+                         _sub(T["pipeline_close"], **gvars)]
+                lines.extend(block if options.pretty else flatten_block(block))
+        lines.append("")
+        lines += _sub_all(T["master_header"], **gvars)
+        block = _sub_all(T["master_open"], **gvars)
+        block += [_sub(T["master_entry"], name=n, **gvars) for n in set_names]
+        block += _sub_all(T["master_close"], **gvars)
+        lines.extend(block if options.pretty else flatten_block(block))
         lines += T.get("footer", [])
+        lines = squeeze_blanks(lines)
 
         out_files: list[GeneratedFile] = []
         for f in self.p.files:

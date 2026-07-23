@@ -25,8 +25,8 @@ FIXTURE = Path(__file__).parent / "fixtures" / "miniproj_py"
 @pytest.fixture(scope="module")
 def chained_idx():
     idx = build_index(FIXTURE, project_name="miniproj_py")
-    dbl = idx.item_by_address("pure.double")
-    tri = idx.item_by_address("pure.triple")
+    dbl = idx.item_by_address("app.double")
+    tri = idx.item_by_address("app.triple")
     pipe = Pipeline(name="chain", stages=[dbl.ordinal, tri.ordinal], checked=True)
     pipe.edges = pipeline_edges([dbl, tri])
     idx.pipelines.append(pipe)
@@ -36,7 +36,7 @@ def chained_idx():
 
 
 def test_direct_chain_gets_an_edge(chained_idx):
-    dbl = chained_idx.item_by_address("pure.double")
+    dbl = chained_idx.item_by_address("app.double")
     assert chained_idx.pipelines[-1].edges == [
         {"after": dbl.ordinal, "from_key": "double_result", "to_key": "x"}
     ]
@@ -59,8 +59,8 @@ def test_runner_without_edges_recomputes(chained_idx):
     try:
         out = run_pipeline(chained_idx, FIXTURE, "chain", {"x": 2})
     finally:
-        dbl = chained_idx.item_by_address("pure.double")
-        tri = chained_idx.item_by_address("pure.triple")
+        dbl = chained_idx.item_by_address("app.double")
+        tri = chained_idx.item_by_address("app.triple")
         chained_idx.pipelines[-1].edges = pipeline_edges([dbl, tri])
     assert out["triple_result"] == 12
 
@@ -98,12 +98,11 @@ def test_generated_rust_pipeline_actually_composes(chained_idx, tmp_path):
     pipeline, and assert 12 — behavior, not just compilation."""
     files = _gen(chained_idx, "rust")
     lib = files["src/lib.rs"]
-    lib = lib.replace(
-        "pub fn double(x: i64) -> i64 {\n        todo!()\n    }",
-        "pub fn double(x: i64) -> i64 {\n        x * 2\n    }")
-    lib = lib.replace(
-        "pub fn triple(x: i64) -> i64 {\n        todo!()\n    }",
-        "pub fn triple(x: i64) -> i64 {\n        x * 3\n    }")
+    # flat mode: one spindle, one line
+    lib = lib.replace("pub fn double(x: i64) -> i64 { todo!() }",
+                      "pub fn double(x: i64) -> i64 { x * 2 }")
+    lib = lib.replace("pub fn triple(x: i64) -> i64 { todo!() }",
+                      "pub fn triple(x: i64) -> i64 { x * 3 }")
     assert "x * 2" in lib and "x * 3" in lib, "stub replacement failed"
     lib += """
 #[cfg(test)]
@@ -116,6 +115,17 @@ mod dataflow_tests {
             op(&mut ctx).unwrap();
         }
         assert_eq!(ctx.triple_result, Some(12));
+        // the built-in workflow tracker recorded every step in order
+        assert_eq!(ctx.spindle_trace, vec![
+            "app.double".to_string(),
+            "edge double_result->x".to_string(),
+            "app.triple".to_string(),
+        ]);
+    }
+    #[test]
+    fn master_spindle_lists_the_pipeline() {
+        let names: Vec<&str> = crate::master_spindle().into_iter().map(|(n, _)| n).collect();
+        assert!(names.contains(&"pipeline_chain"));
     }
 }
 """
@@ -125,3 +135,29 @@ mod dataflow_tests {
     r = subprocess.run(["cargo", "test", "--quiet"], cwd=tmp_path,
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_flat_by_default_pretty_on_request(chained_idx):
+    flat = _gen(chained_idx, "rust")["src/lib.rs"]
+    assert "pub fn double(x: i64) -> i64 { todo!() }" in flat
+    assert "\n\n\n" not in flat, "blank-line runs survived squeeze"
+    pretty = {f.relpath: f.content
+              for f in BACKENDS["rust"]().generate(chained_idx,
+                                                   GenOptions(pretty=True))}["src/lib.rs"]
+    assert "pub fn double(x: i64) -> i64 {\n        todo!()\n    }" in pretty
+
+
+def test_master_spindle_orders_sets_then_pipelines(chained_idx):
+    lib = _gen(chained_idx, "rust")["src/lib.rs"]
+    master = next(line for line in lib.splitlines() if "pub fn master_spindle" in line)
+    assert master.index('("ops_') < master.index('("pipeline_chain"')
+    java = _gen(chained_idx, "java")["Miniproj_py.java"]
+    assert 'm.put("pipeline_chain", pipeline_chain());' in java
+
+
+def test_wrappers_record_spindle_trace(chained_idx):
+    lib = _gen(chained_idx, "rust")["src/lib.rs"]
+    assert '__ctx.spindle_trace.push("app.double".to_string());' in lib
+    assert "pub spindle_trace: Vec<String>," in lib
+    java = _gen(chained_idx, "java")["Miniproj_py.java"]
+    assert '__ctx.spindle_trace.add("app.double");' in java

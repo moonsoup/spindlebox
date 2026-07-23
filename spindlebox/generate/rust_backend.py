@@ -12,7 +12,13 @@ from __future__ import annotations
 
 import hashlib
 
-from spindlebox.generate.base import GeneratedFile, GeneratorBackend, GenOptions
+from spindlebox.generate.base import (
+    GeneratedFile,
+    GeneratorBackend,
+    GenOptions,
+    flatten_block,
+    squeeze_blanks,
+)
 from spindlebox.schema import Group, Item, ScaIndex
 
 _RUST_KEYWORDS = {
@@ -159,7 +165,9 @@ class RustBackend(GeneratorBackend):
         # struct field (pydantic T3, E0124). Build once, deterministically, and use
         # everywhere a ctx field is emitted or accessed.
         ctx_fields: dict[str, str] = {}
-        used_fields: set[str] = set()
+        # spindle_trace is reserved for the built-in workflow tracker; a ctx
+        # key with that name gets deduped like any other collision
+        used_fields: set[str] = {"spindle_trace"}
         for key in sorted(index.ctx_schema):
             base = _ident(key)
             ident = base
@@ -171,6 +179,7 @@ class RustBackend(GeneratorBackend):
             ctx_fields[key] = ident
         for key in sorted(index.ctx_schema):
             lines.append(f"    pub {ctx_fields[key]}: Option<{rust_type(index.ctx_schema[key])}>,")
+        lines.append("    pub spindle_trace: Vec<String>,")
         lines += [
             "}",
             "",
@@ -230,15 +239,22 @@ class RustBackend(GeneratorBackend):
                 params.append(f"{ident}: {rust_type(p.norm_type)}")
             ret = item.signature.returns_norm
             ret_s = "" if ret == "unit" else f" -> {rust_type(ret)}"
-            out.append(f"{indent}pub fn {name}({', '.join(params)}){ret_s} {{")
-            out.append(f"{indent}    todo!()")
-            out.append(f"{indent}}}")
+            skeleton = [
+                f"{indent}pub fn {name}({', '.join(params)}){ret_s} {{",
+                f"{indent}    todo!()",
+                f"{indent}}}",
+            ]
+            out.extend(skeleton if options.pretty else flatten_block(skeleton))
             if item.kind == "function":
-                out.append("")
-                out.append(f"{indent}pub fn {name}_op() -> crate::CtxOp {{")
+                wrapper: list[str] = []
+                wrapper.append(f"{indent}pub fn {name}_op() -> crate::CtxOp {{")
                 # the closure binding is reserved: a source param named 'ctx' (or even
                 # '__ctx') must never shadow it — see issue #1
-                out.append(f"{indent}    Box::new(move |__ctx: &mut crate::Ctx| {{")
+                wrapper.append(f"{indent}    Box::new(move |__ctx: &mut crate::Ctx| {{")
+                wrapper.append(
+                    f"{indent}        __ctx.spindle_trace.push(\"{item.address}\".to_string());")
+                out_append = wrapper.append  # wrapper collects until closed below
+                out, real_out = wrapper, out
                 call_args = []
                 for p, var in zip(sig_params, pidents, strict=True):
                     # blank/ignored params ('_') collapse in the name-keyed param_map,
@@ -273,11 +289,19 @@ class RustBackend(GeneratorBackend):
                 out.append(f"{indent}        Ok(())")
                 out.append(f"{indent}    }})")
                 out.append(f"{indent}}}")
+                out, wrapper = real_out, out
+                del out_append
+                if options.pretty:
+                    out.append("")
+                    out.extend(wrapper)
+                else:
+                    out.extend(flatten_block(wrapper))
                 mod_path = "::".join(_mod_seg(p) for p in item.group.split("."))
                 generated_ops.append((f"crate::{mod_path}::{name}_op()", item.address))
             return out
 
         op_arrays: list[str] = []
+        set_names: list[str] = []  # load order for the master spindle
 
         def emit_group(group: Group, indent: str) -> list[str]:
             out: list[str] = []
@@ -305,11 +329,13 @@ class RustBackend(GeneratorBackend):
                 if not refs:
                     continue
                 arr_name = _ident(f"ops_{group.path.replace('.', '_')}_{n}")
+                set_names.append(arr_name)
                 op_arrays.append(f"// {sig_id} — members: "
                                  + ", ".join(m.address for m in members))
-                op_arrays.append(f"pub fn {arr_name}() -> Vec<crate::CtxOp> {{")
-                op_arrays.append("    vec![" + ", ".join(refs) + "]")
-                op_arrays.append("}")
+                block = [f"pub fn {arr_name}() -> Vec<crate::CtxOp> {{",
+                         "    vec![" + ", ".join(refs) + "]",
+                         "}"]
+                op_arrays.extend(block if options.pretty else flatten_block(block))
             return out
 
         for root in index.groups:
@@ -343,10 +369,26 @@ class RustBackend(GeneratorBackend):
                         dst = ctx_fields.get(e["to_key"], _ident(e["to_key"]))
                         elems.append(
                             "Box::new(move |__ctx: &mut crate::Ctx| { "
+                            f"__ctx.spindle_trace.push(\"edge {src}->{dst}\".to_string()); "
                             f"__ctx.{dst} = __ctx.{src}.clone(); Ok(()) }})")
-                lines.append(f"pub fn pipeline_{_ident(pipe.name)}() -> Vec<crate::CtxOp> {{")
-                lines.append("    vec![" + ", ".join(elems) + "]")
-                lines.append("}")
+                pipe_fn = f"pipeline_{_ident(pipe.name)}"
+                set_names.append(pipe_fn)
+                block = [f"pub fn {pipe_fn}() -> Vec<crate::CtxOp> {{",
+                         "    vec![" + ", ".join(elems) + "]",
+                         "}"]
+                lines.extend(block if options.pretty else flatten_block(block))
+
+        # master spindle: the single entry that defines the load order of every
+        # set and pipeline — the answer to "what runs, in what order"
+        lines.append("")
+        lines.append("// ---- master spindle: load order of every set and pipeline ----")
+        block = ["pub fn master_spindle() -> Vec<(&'static str, Vec<crate::CtxOp>)> {",
+                 "    vec![",
+                 *[f'        ("{n}", crate::{n}()),' for n in set_names],
+                 "    ]",
+                 "}"]
+        lines.extend(block if options.pretty else flatten_block(block))
+        lines = squeeze_blanks(lines)
 
         cargo = "\n".join([
             "[package]",

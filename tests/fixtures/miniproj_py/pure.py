@@ -17,12 +17,3 @@ def reserved(final: int, override: int, macro: int) -> int:
     """Params named after Rust reserved keywords (pydantic T3): must r#-escape."""
     return final + override + macro
 
-
-def double(x: int) -> int:
-    """Double a value (direct-chain pipeline stage)."""
-    return x * 2
-
-
-def triple(x: int) -> int:
-    """Triple a value (direct-chain pipeline stage)."""
-    return x * 3

@@ -30,7 +30,7 @@ Compile-time validation pass over an index.
 **Routine check** — warnings are informational; the model holds:
 
     $ spindlebox validate --project miniproj_py
-    valid: 20 items, 6 warning(s)
+    valid: 18 items, 6 warning(s)
 
 (The warnings go to stderr and name each untyped item — `--verbose` on `index`
 shows the same list.)
@@ -136,7 +136,7 @@ explicit bindings that carry stage N's result into stage N+1's input key
 chain: the edge moves `double_result` into `x` between stages, so the answer is
 `triple(double(2)) = 12`, not two independent reads of the seed ctx:
 
-    $ spindlebox pipeline define chain pure.double pure.triple --project miniproj_py
+    $ spindlebox pipeline define chain app.double app.triple --project miniproj_py
     pipeline 'chain' defined and type-checked (2 stages, 1 data-flow edge(s))
 
     $ spindlebox pipeline run chain --ctx '{"x": 2}' --project miniproj_py

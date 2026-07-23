@@ -242,7 +242,21 @@
     "footer": [
       "}"
     ],
-    "pipeline_edge_op": "(CtxOp) (__ctx) -> { __ctx.${dst} = (${dsttype}) (Object) __ctx.${src}; }"
+    "pipeline_edge_op": "(CtxOp) (__ctx) -> { __ctx.spindle_trace.add(\"edge ${src}->${dst}\"); __ctx.${dst} = (${dsttype}) (Object) __ctx.${src}; }",
+    "ctx_trace_field": "        public java.util.List<String> spindle_trace = new java.util.ArrayList<>();",
+    "wrapper_trace": "${indent}        __ctx.spindle_trace.add(\"${address}\");",
+    "master_header": [
+      "    // ---- master spindle: load order of every set and pipeline ----"
+    ],
+    "master_open": [
+      "    public static java.util.LinkedHashMap<String, java.util.List<CtxOp>> master_spindle() {",
+      "        java.util.LinkedHashMap<String, java.util.List<CtxOp>> m = new java.util.LinkedHashMap<>();"
+    ],
+    "master_entry": "        m.put(\"${name}\", ${name}());",
+    "master_close": [
+      "        return m;",
+      "    }"
+    ]
   },
   "files": [
     {
