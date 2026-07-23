@@ -1,3 +1,5 @@
+[SPIndlebox](https://moonsoup.github.io/spindlebox/) · [Guide](guide/index.md) · Reporting
+
 # Reports — SPIndlestacks
 
 A report is not code. It is a **stack**: a small data file naming an ordered
@@ -28,6 +30,7 @@ Formats: `md` (default) · `csv` · `html` · `json`. Every report accepts
 | `dup-candidates` | What has been written more than once, across every indexed repo? |
 | `compile-matrix` | Which projects generate into which output languages? |
 | `score-history` | Every hardening-harness run, scored and versioned. |
+| `profile-coverage` | Which declared language-profile constructs the test fixtures exercise — the gate in the [add-a-language checklist](guide/languages.md). |
 
 Reports read the SPI indexes of **registered projects** — run
 `spindlebox index <path>` first; `--project` names one, otherwise all.

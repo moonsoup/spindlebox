@@ -64,15 +64,14 @@ spindlebox report                       # list reports; see docs/REPORTING.md
 spindlebox report typing-health --format csv
 ```
 
+**Full guide** — every command with options and use-case examples:
+[docs/guide/](docs/guide/index.md).
+
 ## Where things land
 
-| Command | Output | Where |
-|---|---|---|
-| `index <path>` | the SPI | `<path>/.spi/index.json` — a **hidden** folder (`ls -a`; in Finder `Cmd+Shift+.`), plus an entry in the registry |
-| `generate --lang X` | skeleton source | `./generated_X/` in your current directory, or `--out <dir>` |
-| `report <name>` | the report | **stdout only** — pass `--out <file>` (or redirect) to get a file |
-| `search` / `show` / `deps` / `validate` / `call` | text | stdout |
-| (all commands) | project registry | `~/.spindlebox/registry.json` |
+`index` writes to a **hidden** `<path>/.spi/index.json`; `generate` to
+`./generated_<lang>/`; `report` to stdout unless `--out`. The full table with
+exit codes is in [the housekeeping guide](docs/guide/housekeeping.md).
 
 ## Compatibility
 
@@ -83,24 +82,11 @@ spindlebox report typing-health --format csv
 
 ## Adding a language
 
-Both directions are declarative — any indexed language can be regenerated into any
-output language (e.g. Go in, Java out): `spindlebox generate --lang java`.
-
-**Output languages** are defined by **emit profiles** (`spindlebox/generate/emit_profiles/*.json`):
-identifier/keyword rules, a core-1 → target type table, and code-line templates, consumed
-by a generic emit engine (`generate/profile_backend.py`). Rust's emit profile is held
-byte-identical to the legacy hand-written backend by differential test; Java output exists
-only as a profile and is `javac`-checked in CI and by a continuous hardening harness.
-
-**Input languages** are defined by **extraction profiles** (`spindlebox/extract/profiles/*.json`):
-file extensions, tree-sitter grammar wheel, node-role tables, capture-analysis rules, a
-core-1 type table, and env-var/import patterns. A generic walker (`extract/profile_lang.py`)
-consumes the profile; the handful of genuinely language-specific behaviors live in a shared,
-named hook library that profiles reference by name. Adding a language = one JSON profile +
-one pinned grammar wheel + corpus entries — no new extractor module. Java is implemented
-this way end to end; Go and Bash run through the same walker, differential-tested against
-their legacy extractors (which remain as the reference implementations). Python deliberately
-stays on stdlib `ast`/`symtable` (richer scope analysis than tree-sitter).
+Both directions are declarative JSON profiles — no extractor or backend module,
+no AI required. Any indexed language regenerates into any output language
+(Go in, Java out is one command); Java exists end-to-end as pure data. The
+anatomy walkthrough and copy-paste checklists are in
+[the language guide](docs/guide/languages.md).
 
 ## Notes & limits
 
