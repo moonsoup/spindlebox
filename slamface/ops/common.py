@@ -10,7 +10,13 @@ import os
 import subprocess
 from pathlib import Path
 
-VPS_IP = os.environ.get("SLAMFACE_VPS_IP", "2.25.209.57")
+_ENV_OPS = Path(__file__).resolve().parent.parent / ".env.ops"
+if _ENV_OPS.exists():
+    for _line in _ENV_OPS.read_text().splitlines():
+        if "=" in _line and not _line.lstrip().startswith("#"):
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
+VPS_IP = os.environ.get("SLAMFACE_VPS_IP") or os.environ.get("VPS_IP", "")
 ROOT_KEY = os.path.expanduser(os.environ.get("SLAMFACE_ROOT_KEY", "~/.ssh/ies_hostinger_key"))
 REPO = "moonsoup/spindlebox"
 CONTAINER = "slamface_spindlebox"

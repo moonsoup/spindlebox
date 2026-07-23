@@ -2,7 +2,9 @@
 # Manual deploy fallback + rollback. Mirrors the CI path (runs the same forced-command
 # script as the deploy user). Usage: deploy.sh [--rollback]
 set -euo pipefail
-VPS_IP="${VPS_IP:-2.25.209.57}"
+ENV_OPS="$(cd "$(dirname "$0")/.." && pwd)/.env.ops"
+[ -f "$ENV_OPS" ] && . "$ENV_OPS"
+VPS_IP="${VPS_IP:?VPS_IP not set — create slamface/.env.ops (gitignored) or export VPS_IP}"
 ROOT_KEY="${ROOT_KEY:-$HOME/.ssh/ies_hostinger_key}"
 SSH=(ssh -i "$ROOT_KEY" -o StrictHostKeyChecking=accept-new "root@$VPS_IP")
 

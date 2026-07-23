@@ -10,3 +10,4 @@ build/
 .spi/
 slamface/.env
 slamface/.local/
+slamface/.env.ops
