@@ -70,7 +70,7 @@ Show items by ordinal range, address, or group path, with filters.
 
     spindlebox show [selector] [--project P] [--group G] [--sig-class S]
                     [--lang L] [--name GLOB] [--state-capture SC]
-                    [--deps] [--full] [--json]
+                    [--deps] [--full] [--json] [--fail-on-stale]
 
 ### Options
 
@@ -86,6 +86,22 @@ Show items by ordinal range, address, or group path, with filters.
 | `--deps` | flag | off | append a dependency block per item |
 | `--full` | flag | off | full JSON dict per item |
 | `--json` | flag | off | one JSON array of all matches |
+| `--fail-on-stale` | flag | off | exit non-zero if a shown item's file changed since indexing |
+
+### Spans and staleness
+
+Each item carries `span: [start_line, end_line]`, which is what makes a targeted
+read possible — locate the item, then read only its lines rather than the whole
+file. A span is only worth acting on while the file is unchanged, so `show`
+prints a warning to stderr when any displayed item comes from a file whose
+content hash no longer matches the one recorded at index time:
+
+    warning: 2 file(s) changed since indexing — spans may be wrong: src/cli.py, src/io.py
+             refresh with: spindlebox index /path/to/repo
+
+Add `--fail-on-stale` to turn that warning into a non-zero exit, which is what
+you want in a script that would otherwise act on bad line numbers. See
+[`stale`](#spindlebox-stale) for a whole-tree report.
 
 ### Use cases
 
@@ -116,12 +132,72 @@ signature class matches Python, Rust, Go and TypeScript at once:
 
 ### Exit codes
 
-`0` matches printed · `1` no items match.
+`0` matches printed · `1` no items match, or `--fail-on-stale` was given and a
+shown item's file has changed.
 
 ### See also
 
 [`search`](#spindlebox-search) for fuzzy lookup · [`deps`](#spindlebox-deps) for
-one item's full dependency picture.
+one item's full dependency picture · [`stale`](#spindlebox-stale) for a
+whole-tree freshness report.
+
+## spindlebox stale
+
+Report whether an index still describes the working tree.
+
+### Synopsis
+
+    spindlebox stale [path] [--project P] [--check-new] [--json]
+
+### Options
+
+| Option | Argument | Default | Effect |
+|---|---|---|---|
+| `path` | directory | cwd | repo to check (searches upwards for `.spi/`) |
+| `--project` | name | index at/above cwd | registered project to read |
+| `--check-new` | flag | off | also walk the tree for files added since indexing |
+| `--json` | flag | off | machine-readable report |
+
+### Why this exists
+
+The index records a content hash per file at index time. `stale` re-hashes and
+compares, so you learn that spans have rotted *before* acting on them rather
+than after. Content hash is authoritative and mtime is only a pre-filter: a
+`git checkout` or `touch` rewrites mtime without changing a byte, and treating
+that as a change would make every branch switch look like full invalidation.
+
+By default `stale` reports only on files the index already knows about, because
+detecting *additions* means walking the tree. Pass `--check-new` when you want
+that too.
+
+### Use cases
+
+**Check before trusting spans** — a freshly indexed tree verifies clean:
+
+    $ spindlebox stale --project miniproj_py
+    ... up to date (... files verified)
+
+**After editing a source file**, the changed file is named so you know which
+spans to stop trusting:
+
+    miniproj_py: STALE — 1 changed, 0 missing, 0 new (of 4 indexed)
+      changed  util/io.py
+    re-index to refresh: spindlebox index
+
+**An index built before staleness tracking existed** carries no file metadata,
+which is itself unverifiable — so it is reported rather than silently passed
+as clean:
+
+    miniproj_py: index carries no file metadata (built before staleness tracking) — spans cannot be verified; re-index to enable checking
+
+### Exit codes
+
+`0` index matches the tree · `1` stale, missing, or unverifiable.
+
+### See also
+
+[`index`](#spindlebox-index) to refresh · [`show`](#spindlebox-show) and its
+`--fail-on-stale` flag for per-query checking.
 
 ## spindlebox search
 

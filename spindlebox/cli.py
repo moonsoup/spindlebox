@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import spindlebox
-from spindlebox import registry
+from spindlebox import registry, staleness
 from spindlebox.addresses import parse_selector
 from spindlebox.dispatch import DispatchError, call_item, resolve_item
 from spindlebox.extract import build_index
@@ -62,7 +62,51 @@ def _load_project(args) -> tuple[ScaIndex, Path]:
     return ScaIndex.load(_existing_index_path(root)), root
 
 
+def _warn_if_stale(idx: ScaIndex, root: Path, items, fail: bool = False) -> bool:
+    """Warn when displayed items come from files that changed since indexing.
+
+    Returns True when the caller should exit non-zero (only under --fail-on-stale).
+    A span from a changed file points at whatever now occupies those lines, so
+    saying nothing is the one unacceptable option (#15).
+    """
+    if not idx.files:
+        print(
+            "warning: index has no file metadata (built before staleness tracking) — "
+            "spans are unverified; re-index to enable checking",
+            file=sys.stderr,
+        )
+        return fail
+    stale = sorted({i.file for i in items if staleness.is_stale(idx, root, i.file)})
+    if not stale:
+        return False
+    shown = ", ".join(stale[:5])
+    if len(stale) > 5:
+        shown += f" (+{len(stale) - 5} more)"
+    print(
+        f"warning: {len(stale)} file(s) changed since indexing — spans may be wrong: "
+        f"{shown}\n         refresh with: spindlebox index {root}",
+        file=sys.stderr,
+    )
+    return fail
+
+
 # ------------------------------------------------------------ commands
+
+def cmd_stale(args) -> int:
+    """Report whether an index still matches the working tree."""
+    idx, root = _load_project(args)
+    current = None
+    if args.check_new:
+        from spindlebox.extract.base import discover_files, normalize_langs
+
+        current = [rel for rel, _lang in discover_files(root, normalize_langs(None))]
+    report = staleness.stale_report(idx, root, current=current)
+    if args.json:
+        print(json.dumps(report, indent=1))
+    else:
+        print(staleness.format_report(report, root))
+    return 0 if report["ok"] else 1
+
 
 def cmd_index(args) -> int:
     root = Path(args.path).resolve()
@@ -161,9 +205,10 @@ def cmd_show(args) -> int:
     if not items:
         print("no items match", file=sys.stderr)
         return 1
+    stale_fail = _warn_if_stale(idx, _root, items, getattr(args, "fail_on_stale", False))
     if args.json:
         print(json.dumps([i.to_dict() for i in items], indent=1))
-        return 0
+        return 1 if stale_fail else 0
     for item in items:
         print(_item_line(item))
         if args.full:
@@ -172,7 +217,7 @@ def cmd_show(args) -> int:
             block = _deps_block(item)
             if block:
                 print(block)
-    return 0
+    return 1 if stale_fail else 0
 
 
 def cmd_search(args) -> int:
@@ -221,6 +266,7 @@ def cmd_search(args) -> int:
 def cmd_deps(args) -> int:
     idx, _root = _load_project(args)
     item = resolve_item(idx, args.selector)
+    _warn_if_stale(idx, _root, [item], fail=False)
     if args.reverse:
         callers = [i for i in idx.items if item.address in i.deps.calls]
         print(f"callers of {item.address}:")
@@ -483,6 +529,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--deps", action="store_true")
     p.add_argument("--full", action="store_true")
     p.add_argument("--json", action="store_true")
+    p.add_argument("--fail-on-stale", dest="fail_on_stale", action="store_true",
+                   help="exit non-zero if a shown item's file changed since indexing")
     p.set_defaults(func=cmd_show)
 
     p = sub.add_parser("search", help="search items (the anti-bloat check)")
@@ -500,6 +548,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_project_arg(p)
     p.add_argument("--reverse", action="store_true", help="show callers instead")
     p.set_defaults(func=cmd_deps)
+
+    p = sub.add_parser("stale", help="report whether the index still matches the tree")
+    p.add_argument("path", nargs="?")
+    _add_project_arg(p)
+    p.add_argument("--check-new", action="store_true",
+                   help="also walk the tree for files added since indexing (slower)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_stale)
 
     p = sub.add_parser("validate", help="compile-time validation pass over an index")
     p.add_argument("path", nargs="?")

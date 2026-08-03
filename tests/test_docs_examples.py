@@ -90,7 +90,7 @@ def test_documented_example_is_truthful(world, doc, cmd, expected):
 
 
 _CMD_DOCS = {
-    "querying.md": ["index", "show", "search", "deps"],
+    "querying.md": ["index", "show", "search", "deps", "stale"],
     "model.md": ["validate", "call", "pipeline"],
     "generating.md": ["generate"],
     "analysis.md": ["gaps", "workflows"],

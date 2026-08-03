@@ -18,6 +18,7 @@ from spindlebox.extract.base import (
 )
 from spindlebox.schema import CtxAdapter, Deps, Group, Item, Param, ScaIndex, Signature
 from spindlebox.sigclass import build_signature_classes, partition_op_arrays, sig_class_id
+from spindlebox.staleness import snapshot_files
 from spindlebox.typenorm import normalize
 
 
@@ -70,12 +71,17 @@ def build_index(
 
     decls: list[RawDecl] = []
     errors: list[str] = []
+    # every file we actually read, so staleness can be checked later (#15).
+    # a file that failed to parse still counts: it was read, and a later edit
+    # to it is exactly the change a caller needs to know about.
+    read_files: list[str] = []
     for rel, lang in discover_files(root, lang_list):
         try:
             source = (root / rel).read_text(errors="replace")
         except OSError as e:
             errors.append(f"{rel}: unreadable ({e})")
             continue
+        read_files.append(rel)
         try:
             decls.extend(_extract_file(lang, rel, source))
         except SyntaxError as e:
@@ -172,6 +178,7 @@ def build_index(
         pipelines=list(old_index.pipelines) if old_index else [],
         ctx_schema=ctx_schema,
         retired_ordinals=retired,
+        files=snapshot_files(root, read_files),
     )
     if errors:
         index.parse_errors = errors  # serialized: an index must never hide skipped files

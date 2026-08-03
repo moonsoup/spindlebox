@@ -267,6 +267,10 @@ class ScaIndex:
     # files the extractor could not parse — serialized so an index can never
     # silently pass as complete while missing code
     parse_errors: list[str] = field(default_factory=list)
+    # {relative_path: {hash, mtime, size}} captured at index time, so a caller
+    # can tell whether a span is still trustworthy. Empty on indexes built
+    # before staleness tracking existed — treated as unverifiable, not clean.
+    files: dict[str, dict] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -284,6 +288,7 @@ class ScaIndex:
             "ctx_schema": self.ctx_schema,
             "retired_ordinals": self.retired_ordinals,
             "parse_errors": self.parse_errors,
+            "files": self.files,
         }
 
     @classmethod
@@ -310,6 +315,7 @@ class ScaIndex:
             ctx_schema=dict(d.get("ctx_schema", {})),
             retired_ordinals=list(d.get("retired_ordinals", [])),
             parse_errors=list(d.get("parse_errors", [])),
+            files=dict(d.get("files", {})),
         )
 
     def save(self, path: str | Path) -> None:
