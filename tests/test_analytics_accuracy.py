@@ -103,69 +103,92 @@ def test_consequence_a_ambiguous_calls_credit_every_candidate():
                         assert item.address in callers.get(other.address, set())
 
 
-def test_consequence_b_workflows_zero_the_call_term():
-    """workflows.py:30 tests `b.address in a.deps.calls`. An `external:` entry never
-    equals an item address, so `calls` is 0.0 and the edge can score at most
-    W_CTX + W_GROUP = 0.5 — below the 0.6 default, so it is dropped entirely.
+def test_consequence_b_pure_ctx_chains_are_now_admitted():
+    """Before the fix, an ambiguous call scored 0.0 on the call term, so an edge could
+    reach at most W_CTX + W_GROUP = 0.5 — below the old 0.6 default, and dropped. That
+    took a whole class of edge out of mining: a pure ctx chain (A provides everything B
+    requires, same group) with no direct call between them.
 
-    Ambiguously-named calls are therefore invisible to workflow mining too, which is why
-    the surviving edges are so uniform (see ANL-02).
+    At the corrected default those edges exactly meet the bar, so ctx-only pipelines —
+    the thing `pipeline define` exists to formalise — are mineable again.
     """
-    assert round(W_CTX + W_GROUP, 4) < inspect.signature(
-        mine_workflows).parameters["min_confidence"].default
+    default = inspect.signature(mine_workflows).parameters["min_confidence"].default
+    full_ctx_same_group = round(W_CTX * 1.0 + W_GROUP * 1.0, 4)
+    assert full_ctx_same_group >= default, "a fully-covered ctx edge must be admissible"
 
 
 # --------------------------------------- ANL-02: the default threshold pins confidence
 
 
-def test_default_threshold_exactly_equals_a_plain_call_edge_score():
-    """Why every mined workflow reports the same confidence.
+def test_default_threshold_is_below_the_plain_call_edge_score():
+    """ANL-02, fixed. The old default (0.6) was EXACTLY W_CALL + W_GROUP — the score of
+    the commonest edge, a call within one group — so only top-of-range edges were
+    admitted and they were all identical. Flow confidence is `min(confs)`, so every
+    candidate pinned to 0.60.
 
-    Edge score (workflows.py:35) is 0.5*calls + 0.4*ctx_coverage + 0.1*same_subtree.
-    The commonest surviving edge — A calls B, both in one group, no shared ctx keys —
-    scores W_CALL + W_GROUP = 0.6, EXACTLY the default min_confidence. It is admitted at
-    precisely the cutoff. Flow confidence is `min(confs)` (:72), so one such edge
-    anywhere on a path pins the whole candidate to 0.60.
+    Measured on the spindlebox repo (681 items, 200 candidates, cap binding):
+        threshold 0.6  -> 1 distinct strength
+        threshold 0.55 -> 25
+        threshold 0.5  -> 38          <- same candidate count, 38x the discrimination
 
-    #17's "all 171 candidates return identical confidence" is therefore structural.
-    docs/guide/analysis.md:80-81 shows it in the project's own output: two candidates,
-    both [conf 0.60].
+    The default must stay strictly below the modal edge score or the admitted set
+    degenerates to a single value again.
     """
     default = inspect.signature(mine_workflows).parameters["min_confidence"].default
-    assert default == 0.6
-
-    # round() mirrors _edge_confidence, which rounds to 4dp; 0.5 + 0.1 is
-    # 0.6000000000000001 in binary floating point.
+    # round() mirrors _edge_confidence; 0.5 + 0.1 is 0.6000000000000001 in binary float.
     plain_call_in_group = round(W_CALL * 1.0 + W_CTX * 0.0 + W_GROUP * 1.0, 4)
-    assert plain_call_in_group == default
+    assert default < plain_call_in_group, "default sits on the modal edge score again"
 
 
-def test_a_call_edge_across_groups_falls_below_the_default():
-    """The mirror image: the same call edge in a different group scores 0.5 and is
-    dropped. The default threshold is a near-binary filter on `same_subtree`, not a
-    confidence gradient — which is why surviving scores do not spread."""
-    default = inspect.signature(mine_workflows).parameters["min_confidence"].default
-    assert round(W_CALL * 1.0 + W_GROUP * 0.0, 4) < default
+def test_group_affinity_is_graded_not_boolean():
+    """The old `_same_subtree` was 0/1, so group proximity contributed either 0.0 or
+    0.1 and nothing between. Sibling modules now score between those bounds."""
+    from spindlebox.workflows import _group_affinity
+
+    class _I:
+        def __init__(self, group):
+            self.group = group
+
+    assert _group_affinity(_I("a.b"), _I("a.b")) == 1.0        # same group
+    assert _group_affinity(_I("a.b"), _I("x.y")) == 0.0        # unrelated
+    sibling = _group_affinity(_I("a.b"), _I("a.c"))            # same package
+    assert 0.0 < sibling < 1.0
 
 
-def test_existing_workflow_tests_avoid_the_default_threshold():
-    """Why the suite never caught ANL-02: tests/test_workflows.py:14 builds its fixture
-    with min_confidence=0.5, and test_confidence_and_threshold asserts only monotonicity
-    (len(low) >= len(high)) — never that confidences DIFFER."""
-    src = (Path(__file__).parent / "test_workflows.py").read_text()
-    assert "min_confidence=0.5" in src
-    assert "min_confidence=0.6" not in src
+def test_ambiguous_calls_contribute_partial_edge_weight():
+    """An ambiguous call is real evidence that ONE candidate is called, so the weight
+    splits across candidates rather than being discarded (the ANL-03 tail)."""
+    from spindlebox.workflows import _call_strength
+
+    class _I:
+        def __init__(self, address, name, calls):
+            self.address, self.name = address, name
+            self.deps = type("D", (), {"calls": calls})()
+
+    caller = _I("m.caller", "caller", ["ambiguous:close"])
+    target = _I("io.Reader.close", "close", [])
+    assert _call_strength(caller, target, {"close": 2}) == 0.5
+    assert _call_strength(caller, target, {"close": 4}) == 0.25
+    # a resolved call is still full weight
+    direct = _I("m.direct", "direct", ["io.Reader.close"])
+    assert _call_strength(direct, target, {}) == 1.0
 
 
-def test_mined_confidence_spread_at_default_threshold(idx):
-    """The observable symptom, recorded rather than asserted — the fixture is small, so
-    this prints the spread instead of hard-failing on it. On a real project #17 measured
-    exactly one distinct value across 171 candidates."""
-    flows = mine_workflows(idx)  # default threshold
-    spread = sorted({f["confidence"] for f in flows})
-    print(f"\ndistinct confidences at default threshold: {spread} over {len(flows)} candidates")
+def test_mined_candidates_are_distinguishable(idx):
+    """The symptom #17 actually reported: candidates you cannot tell apart.
+
+    `confidence` is the weakest link and still clusters at the threshold by design —
+    that is what a gate does. `strength` is what ranks them, so it must carry more
+    than one value on any non-trivial index.
+    """
+    flows = mine_workflows(idx)
+    assert flows, "fixture should mine at least one candidate"
     for f in flows:
         assert 0.0 <= f["confidence"] <= 1.0
+        assert f["confidence"] <= f["strength"] <= 1.0, "min must not exceed mean"
+    # ranked best-first by strength
+    strengths = [f["strength"] for f in flows]
+    assert strengths == sorted(strengths, reverse=True)
 
 
 # --------------------------------- ANL-01: dead code in gaps.py — benign, NOT a bug

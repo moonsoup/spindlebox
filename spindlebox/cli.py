@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import spindlebox
-from spindlebox import registry, staleness
+from spindlebox import registry, staleness, workflows
 from spindlebox.addresses import parse_selector
 from spindlebox.dispatch import DispatchError, call_item, resolve_item
 from spindlebox.extract import build_index
@@ -509,7 +509,8 @@ def cmd_workflows(args) -> int:
         return 0
     for f in flows[: args.limit]:
         chain = " → ".join(f["addresses"])
-        print(f"[conf {f['confidence']:.2f}] ({f['stages']} stages) {chain}")
+        print(f"[conf {f['confidence']:.2f} str {f['strength']:.2f}] "
+              f"({f['stages']} stages) {chain}")
     return 0
 
 
@@ -664,7 +665,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("workflows", help="mine candidate cross-function pipelines from the SPI")
     _add_project_arg(p)
-    p.add_argument("--min-confidence", type=float, default=0.6, dest="min_confidence")
+    p.add_argument("--min-confidence", type=float, default=workflows.DEFAULT_MIN_CONFIDENCE,
+                   dest="min_confidence")
     p.add_argument("--limit", type=int, default=50)
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_workflows)

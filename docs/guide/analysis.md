@@ -68,7 +68,7 @@ latent in the code's call graph and ctx contracts.
 | Option | Argument | Default | Effect |
 |---|---|---|---|
 | `--project` | name | index at/above cwd | registered project |
-| `--min-confidence` | float | 0.6 | edge threshold (0.5×calls + 0.4×ctx-coverage + 0.1×same-group) |
+| `--min-confidence` | float | 0.5 | edge threshold (0.5×calls + 0.4×ctx-coverage + 0.1×group-affinity) |
 | `--limit` | int | 50 | max candidates |
 | `--json` | flag | off | machine-readable |
 
@@ -77,8 +77,13 @@ latent in the code's call graph and ctx contracts.
 **Discover latent chains:**
 
     $ spindlebox workflows --project miniproj_py --limit 3
-    [conf 0.60] (2 stages) util.io.Reader.read → util.io.read_lines
-    [conf 0.60] (2 stages) util.io.read_lines → util.io.Reader.read
+    [conf 0.50 str 0.53] (3 stages) app.make_reader.read → util.io.read_lines → util.io.Reader.read
+
+Two numbers, because one is not enough. **`conf`** is the weakest edge on the
+chain — it gates admission, so it clusters near `--min-confidence` by
+construction and cannot rank anything. **`str`** is the mean edge weight, which
+is what actually orders candidates. Ranking by `conf` alone made every
+candidate look identical (issue #17).
 
 **Promote a mined chain to a real pipeline** — the output is
 `pipeline define`-compatible (ordered addresses), so a candidate becomes a
