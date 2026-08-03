@@ -176,12 +176,22 @@ def collect_score_history(ctx):
             s = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError):
             continue
-        rows.append({k: s.get(k) for k in (
+        row = {k: s.get(k) for k in (
             "run_id", "tier", "score", "threshold", "green", "stages", "failures",
-            "spindlebox_version")})
+            "spindlebox_version")}
+        # A score is a percentage of what was MEASURED: criteria whose stages all
+        # skipped leave the denominator entirely, so 100.0 can mean 100% of 90 weight.
+        # Carrying the coverage stops a skip from reading as a pass. Older records
+        # predate these keys and render blank rather than being back-filled.
+        ew, pw = s.get("evaluated_weight"), s.get("profile_weight")
+        row["measured"] = f"{ew:g}/{pw:g}" if ew is not None and pw else None
+        row["unevaluated"] = ", ".join(sorted(
+            name for name, c in (s.get("criteria") or {}).items()
+            if not c.get("evaluated"))) or None
+        rows.append(row)
     ctx.update(title="Score history — every harness run",
-               columns=["run_id", "tier", "score", "threshold", "green", "stages",
-                        "failures", "spindlebox_version"],
+               columns=["run_id", "tier", "score", "measured", "unevaluated", "threshold",
+                        "green", "stages", "failures", "spindlebox_version"],
                rows=rows)
     return ctx
 
