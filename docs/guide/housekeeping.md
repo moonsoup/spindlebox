@@ -29,13 +29,14 @@ Manage the registry directly.
 
 ### Synopsis
 
-    spindlebox projects list
+    spindlebox projects [list]
     spindlebox projects add <name> <path>
     spindlebox projects remove <name>
+    spindlebox projects prune [--dry-run]
 
 ### Use cases
 
-**See everything indexed:**
+**See everything indexed** — the subcommand is optional, bare `projects` lists:
 
     $ spindlebox projects list
     miniproj_gaps: .../miniproj_gaps (indexed ...)
@@ -46,6 +47,18 @@ Manage the registry directly.
 `.spi/index.json` under the path ("run spindlebox index first" otherwise);
 `projects remove` only forgets the registry entry, the project's `.spi/` is
 untouched.
+
+**Clear out entries whose project has moved or gone.** Projects get renamed,
+deleted, or indexed from a temp directory that no longer exists, and every one
+of those turns into a `warning: skipping ...` line on each `--all-projects`
+search until removed:
+
+    $ spindlebox projects prune --dry-run
+    no dangling entries
+
+`prune` removes only the registry entry, never a file on disk — re-indexing a
+project registers it again, so the operation is recoverable by construction.
+Use `--dry-run` to see what would go first.
 
 ## spindlebox install-skill
 

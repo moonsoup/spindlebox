@@ -225,7 +225,7 @@ whether you already have it, in any language, in any indexed repo.
 ### Synopsis
 
     spindlebox search <query> [--project P] [--all-projects]
-                      [--sig-class S] [--lang L] [--limit N] [--json]
+                      [--sig-class S] [--lang L] [--limit N] [--no-tests] [--json]
 
 ### Options
 
@@ -237,7 +237,12 @@ whether you already have it, in any language, in any indexed repo.
 | `--sig-class` | sig id | — | restrict to one signature class |
 | `--lang` | language | — | restrict to one language |
 | `--limit` | int | 25 | truncate results |
+| `--no-tests` | flag | off | drop test/spec items — anti-bloat wants product code |
 | `--json` | flag | off | JSON array, each item tagged with its `project` |
+
+`--no-tests` matches whole dotted segments (`tests`, `spec`, `conftest`, `__tests__`) plus
+`test_*`, `*_test` and `*_spec`. It is segment-based on purpose: a substring match would
+also swallow `latest` and `contested`. Off by default, so existing behaviour is unchanged.
 
 ### Use cases
 

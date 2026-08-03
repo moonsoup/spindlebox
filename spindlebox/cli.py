@@ -240,6 +240,8 @@ def cmd_search(args) -> int:
     results = []
     for pname, idx in targets:
         for item in idx.items:
+            if getattr(args, "no_tests", False) and registry.is_test_address(item.address):
+                continue
             if args.sig_class and item.sig_class != args.sig_class:
                 continue
             if args.lang and item.language != args.lang:
@@ -394,6 +396,15 @@ def cmd_projects(args) -> int:
         registry.unregister(args.name)
         print(f"removed '{args.name}'")
         return 0
+    if args.proj_cmd == "prune":
+        dead = registry.prune(dry_run=args.dry_run)
+        if not dead:
+            print("no dangling entries")
+            return 0
+        verb = "would remove" if args.dry_run else "removed"
+        for name in dead:
+            print(f"{verb} '{name}' (index file gone)")
+        return 0
     projects = registry.list_projects()
     if not projects:
         print("no projects registered")
@@ -547,6 +558,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--sig-class", dest="sig_class")
     p.add_argument("--lang")
     p.add_argument("--limit", type=int, default=25)
+    p.add_argument("--no-tests", action="store_true", dest="no_tests",
+                   help="exclude test/spec items — anti-bloat wants product code")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_search)
 
@@ -614,14 +627,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_pipeline)
 
     p = sub.add_parser("projects", help="manage the central project registry")
-    proj_sub = p.add_subparsers(dest="proj_cmd", required=True)
+    # not required: bare `spindlebox projects` lists, rather than erroring
+    proj_sub = p.add_subparsers(dest="proj_cmd", required=False)
     proj_sub.add_parser("list")
     a = proj_sub.add_parser("add")
     a.add_argument("name")
     a.add_argument("path")
     r = proj_sub.add_parser("remove")
     r.add_argument("name")
-    p.set_defaults(func=cmd_projects)
+    pr = proj_sub.add_parser("prune", help="drop entries whose index file is gone")
+    pr.add_argument("--dry-run", action="store_true", dest="dry_run")
+    p.set_defaults(func=cmd_projects, proj_cmd=None, dry_run=False)
 
     p = sub.add_parser("gaps", help="find gaps in the software (dead items, unprovided ctx "
                        "keys, unresolvable calls, near-duplicates)")
