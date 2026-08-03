@@ -24,6 +24,32 @@ from spindlebox.schema import Item, ScaIndex
 #: Length of the hex digest kept per file. Matches the per-item `hash` field.
 DIGEST_CHARS = 16
 
+#: First release that recorded a `files` map. Below this, an absent map means
+#: "built before tracking existed"; at or above it, an EMPTY map is a real
+#: answer — the project genuinely has no indexable files (#19).
+TRACKING_SINCE = (1, 3, 0)
+
+
+def _version_tuple(version: str) -> tuple[int, ...]:
+    """Lenient '1.3.0' -> (1, 3, 0). Unparseable segments count as 0 rather than
+    raising: a malformed version must not crash a staleness check."""
+    parts = []
+    for segment in str(version).split("."):
+        digits = "".join(c for c in segment if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def tracks_files(index: ScaIndex) -> bool:
+    """Whether this index was built by a version that records file metadata.
+
+    `ScaIndex.files` defaults to `{}` and `from_dict` loads a missing "files" key
+    as `{}` too, so an empty map alone cannot distinguish a pre-1.3.0 index from
+    an empty project. The version string already carries that distinction, so no
+    schema change is needed.
+    """
+    return _version_tuple(index.spindlebox_version) >= TRACKING_SINCE
+
 
 def file_digest(path: str | Path) -> str | None:
     """`sha256:<16 hex>` for a file's bytes, or None if it cannot be read."""
@@ -89,7 +115,9 @@ def stale_report(index: ScaIndex, root: str | Path, current=None) -> dict:
     """
     root = Path(root)
     files = index.files or {}
-    if not files:
+    # An empty map is only "unverifiable" when the index predates tracking. From
+    # 1.3.0 on it is a genuine answer: zero indexable files (#19).
+    if not files and not tracks_files(index):
         return {
             "ok": False,
             "has_metadata": False,
@@ -98,6 +126,7 @@ def stale_report(index: ScaIndex, root: str | Path, current=None) -> dict:
             "added": [],
             "unchanged": [],
             "indexed_count": 0,
+            "checked_new": current is not None,
         }
 
     changed, missing, unchanged = [], [], []
@@ -120,6 +149,11 @@ def stale_report(index: ScaIndex, root: str | Path, current=None) -> dict:
         "added": added,
         "unchanged": sorted(unchanged),
         "indexed_count": len(files),
+        # Whether added-file detection actually ran. Without this a caller cannot
+        # tell "no new files" from "new files were never looked for" — and the
+        # default does not look (#15 was 18% wrong spans AND 36% missing files;
+        # only the first half is caught by default).
+        "checked_new": current is not None,
     }
 
 
@@ -131,7 +165,12 @@ def format_report(report: dict, root: str | Path) -> str:
             f"tracking) — spans cannot be verified; re-index to enable checking"
         )
     if report["ok"]:
-        return f"{root}: up to date ({report['indexed_count']} files verified)"
+        msg = f"{root}: up to date ({report['indexed_count']} files verified)"
+        if not report.get("checked_new"):
+            # A verdict that names what it did not check is not misleading; a bare
+            # "up to date" is. New files are invisible without --check-new.
+            msg += "; new files not checked — re-run with --check-new"
+        return msg
 
     lines = [
         f"{root}: STALE — "

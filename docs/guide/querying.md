@@ -186,14 +186,16 @@ that as a change would make every branch switch look like full invalidation.
 
 By default `stale` reports only on files the index already knows about, because
 detecting *additions* means walking the tree. Pass `--check-new` when you want
-that too.
+that too — and note that the default verdict says so, rather than letting a bare
+"up to date" imply a check it did not run.
 
 ### Use cases
 
-**Check before trusting spans** — a freshly indexed tree verifies clean:
+**Check before trusting spans** — a freshly indexed tree verifies clean, and
+names what it did not look at:
 
     $ spindlebox stale --project miniproj_py
-    ... up to date (... files verified)
+    ... up to date (... files verified); new files not checked — re-run with --check-new
 
 **After editing a source file**, the changed file is named so you know which
 spans to stop trusting:

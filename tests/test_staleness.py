@@ -120,6 +120,58 @@ class TestStaleReport:
         assert report["has_metadata"] is False
         assert report["ok"] is False
 
+    def test_empty_project_is_up_to_date_not_unverifiable(self, tmp_path):
+        """#19 — an empty project and a pre-1.3.0 index both load as files == {},
+        because `from_dict` reads a missing "files" key as {}. The version string
+        already distinguishes them, so no schema change is needed.
+
+        Before this, `spindlebox stale` on an empty project exited 1 telling the user
+        to re-index — which produced the identical empty map and the same failure.
+        """
+        index = make_index()
+        index.root = str(tmp_path)
+        index.files = {}
+        index.spindlebox_version = "1.3.0"      # tracking was active; {} is a real answer
+        report = staleness.stale_report(index, tmp_path)
+        assert report["has_metadata"] is True
+        assert report["ok"] is True
+        assert report["indexed_count"] == 0
+        assert "up to date" in staleness.format_report(report, tmp_path)
+
+    def test_pre_tracking_version_still_flagged_even_at_1_2(self, tmp_path):
+        """The boundary is 1.3.0 exactly — 1.2.x predates the files map."""
+        index = make_index()
+        index.root = str(tmp_path)
+        index.files = {}
+        index.spindlebox_version = "1.2.0"
+        assert staleness.stale_report(index, tmp_path)["has_metadata"] is False
+
+    def test_malformed_version_does_not_crash(self, tmp_path):
+        """A bad version string must degrade to "cannot vouch", never raise."""
+        index = make_index()
+        index.root = str(tmp_path)
+        index.files = {}
+        index.spindlebox_version = "not-a-version"
+        assert staleness.stale_report(index, tmp_path)["has_metadata"] is False
+
+    def test_report_records_whether_new_files_were_checked(self, project):
+        """STALE-01 — `added: []` alone cannot distinguish "no new files" from "new
+        files were never looked for", and the default never looks. #15 was 18% wrong
+        spans AND 36% missing files; only the first half is caught by default.
+        """
+        root, index = project
+        write(root, "src/new.py", "def g():\n    pass\n")
+
+        default = staleness.stale_report(index, root)
+        assert default["ok"] is True                      # unchanged behaviour
+        assert default["checked_new"] is False
+        assert "new files not checked" in staleness.format_report(default, root)
+
+        checked = staleness.stale_report(index, root, current=["src/mod.py", "src/new.py"])
+        assert checked["checked_new"] is True
+        assert checked["added"] == ["src/new.py"]
+        assert "new files not checked" not in staleness.format_report(checked, root)
+
 
 class TestIsStale:
     def test_false_for_untouched_file(self, project):

@@ -69,7 +69,7 @@ def _warn_if_stale(idx: ScaIndex, root: Path, items, fail: bool = False) -> bool
     A span from a changed file points at whatever now occupies those lines, so
     saying nothing is the one unacceptable option (#15).
     """
-    if not idx.files:
+    if not idx.files and not staleness.tracks_files(idx):
         print(
             "warning: index has no file metadata (built before staleness tracking) — "
             "spans are unverified; re-index to enable checking",
