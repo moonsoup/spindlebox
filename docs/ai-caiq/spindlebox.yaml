@@ -1,0 +1,230 @@
+meta:
+  subject: SPIndlebox — the SPIndleframe indexer (Serialized Process Index)
+  repo: moonsoup/spindlebox
+  owner: ours
+  commit_assessed: 90f25c8 (branch fix/issue-17-ambiguous-call-resolution)
+  role: >
+    Locally-run developer CLI, MIT licensed. Not a hosted service, not multi-tenant, no
+    customer data, no model training or inference. It reads source trees on the operator's
+    own machine and writes .spi/index.json beside them. This scoping is material to most
+    answers below.
+  specification: AI-CAIQ v1.1.0 / AICM v1.1.0
+  status: in-progress
+  started: 2026-08-03
+  scope_note: >
+    A THIRD subject, deliberately separate from rockin-robin.yaml and ssm-factory.yaml per
+    the standing owner direction in docs/ai-caiq/README.md ("keep an AI-CAIQ for both ...
+    don't confuse them"). No answer here borrows evidence from either.
+  completeness: >
+    10 of 247 controls answered. The remaining 237 are UNASSESSED and are left EMPTY in the
+    workbook — not "No". Nobody has examined them against this subject yet. Per the
+    maintenance rules, silence must never read as a finding.
+
+answers:
+
+# ---------------------------------------------------------------- change control
+
+- control: CCC-02
+  title: Quality Testing
+  answer: 'Yes'
+  ssrm: OSP
+  implementation: >
+    Every push to main runs ruff and the full pytest suite, and the deploy job declares
+    `needs: test`, so nothing ships past a red suite. The workflow also asserts the
+    compile toolchains exist before testing, specifically so that compile-check tests
+    cannot skip silently and be counted as passes. Documentation is executed as part of
+    the suite: tests/test_docs_examples.py runs every `$ spindlebox ...` block in
+    docs/guide/*.md and diffs each options table against --help in both directions, so an
+    undocumented flag or an untruthful example fails the build.
+  evidence:
+  - type: config
+    ref: .github/workflows/deploy.yml:15-20, 22-23
+    observed: "pip install -e .[dev]; cargo --version && javac -version; ruff check .; pytest -q; deploy needs: test"
+    date: 2026-08-03
+  - type: test-run
+    ref: python3 -m pytest tests/ -q && ruff check .
+    observed: 373 passed, 3 skipped; ruff "All checks passed!"
+    date: 2026-08-03
+  - type: code-survey
+    ref: tests/test_docs_examples.py:74-89, 101-116
+    observed: documented examples executed and shape-matched; options tables diffed against --help
+    date: 2026-08-03
+
+- control: CCC-03
+  title: Change Management Technology
+  answer: 'Yes'
+  ssrm: OSP
+  implementation: >
+    Changes are tracked in git with GitHub as the system of record: issues carry the
+    defect, commits reference the issue, and CI gates the merge. Defects found during this
+    assessment were filed as issues #20-#27 with reproduction evidence before being fixed,
+    and the fixing commits name them.
+  evidence:
+  - type: artifact
+    ref: gh issue list --repo moonsoup/spindlebox
+    observed: issues #17-#27 open with evidence bodies; commits 11e98ff, 3c9087a, 90f25c8 reference them
+    date: 2026-08-03
+
+- control: CCC-04
+  title: Unauthorized Change Protection
+  answer: 'No'
+  ssrm: OSP
+  implementation: >
+    The default branch has no branch protection: the GitHub API returns 404 for its
+    protection settings, so a direct push to main is possible and no review is required
+    before merge. WHAT DOES EXIST: CI runs on every push to main and the deploy job is
+    gated on it, so an unreviewed change is still tested before it deploys — but it is not
+    prevented from landing. Single-maintainer repository, which is the mitigating context,
+    not a control.
+  evidence:
+  - type: config
+    ref: gh api repos/moonsoup/spindlebox/branches/main/protection
+    observed: '{"message":"Not Found", "status":"404"} — no protection configured'
+    date: 2026-08-03
+
+# ---------------------------------------------------------------- logging
+
+- control: LOG-12
+  title: Transaction/Activity Logging
+  answer: 'No'
+  ssrm: OSP
+  implementation: >
+    No structured logging exists. Zero modules import the logging module; the CLI writes
+    human-readable text to stdout/stderr and retains nothing. There is no run identity — no
+    run id, operator, or invocation timestamp — so "what was indexed, when, by whom" cannot
+    be answered after the fact. WHAT DOES EXIST: each index records `generated_at` and
+    `spindlebox_version` in .spi/index.json, giving artifact-level provenance at coarse
+    granularity, but no activity record.
+  evidence:
+  - type: code-survey
+    ref: grep -rl "import logging" spindlebox/
+    observed: 0 of 16 modules
+    date: 2026-08-03
+  - type: code-survey
+    ref: spindlebox/schema.py:253-263 (ScaIndex fields)
+    observed: generated_at + spindlebox_version present; no operator, run id, or invocation record
+    date: 2026-08-03
+
+- control: LOG-10
+  title: Audit Records Protection
+  answer: 'No'
+  ssrm: OSP
+  implementation: >
+    There are no audit records to protect (see LOG-12), and the index artifact itself
+    carries no integrity binding against tampering: .spi/index.json can be edited after
+    generation and nothing detects it. WHAT DOES EXIST: sha256 content hashes are stored
+    per indexed FILE and per item, and `spindlebox stale` uses them to detect drift between
+    the index and the source tree. That is drift detection against the tree, not integrity
+    protection of the index — an edited index would simply assert whatever it now says.
+  evidence:
+  - type: code-survey
+    ref: grep -rn "sha256" spindlebox/
+    observed: 5 uses; spindlebox/staleness.py:28-34 hashes source files, schema.py:150 hashes item bodies
+    date: 2026-08-03
+  - type: code-survey
+    ref: spindlebox/staleness.py:59-68 (is_stale)
+    observed: compares on-disk digest to the recorded one; no signature or manifest over the index itself
+    date: 2026-08-03
+
+- control: LOG-03
+  title: Security Monitoring and Alerting
+  answer: 'No'
+  ssrm: OSP
+  implementation: >
+    None, and none is wired: there is no daemon, no service, and no network egress to alert
+    to. Searched for logging, monitoring, telemetry and alerting integrations across
+    spindlebox/ and found no logging imports and no network client library of any kind
+    (requests, urllib, httpx, socket). The tool runs, prints, and exits.
+  evidence:
+  - type: code-survey
+    ref: grep -rlE "import (requests|urllib|httpx|socket)|from (requests|urllib|httpx|socket)" spindlebox/
+    observed: 0 files — no network capability to alert over
+    date: 2026-08-03
+  - type: code-survey
+    ref: grep -rl "import logging" spindlebox/
+    observed: 0 files
+    date: 2026-08-03
+
+# ---------------------------------------------------------------- AI-specific
+
+- control: AIS-13
+  title: AI Sandboxing
+  answer: 'No'
+  ssrm: OSP
+  implementation: >
+    `spindlebox call` and `pipeline run` execute code from the INDEXED project in the
+    caller's own interpreter, with no sandbox, no allowlist and no isolation boundary.
+    spindlebox/dispatch.py:48 performs `spec.loader.exec_module(module)` on the target
+    file, so module-level side effects of that file execute on import — before the selected
+    function is even invoked. Indexing itself is static and safe (tree-sitter parsing only);
+    the exposure is confined to the two commands that deliberately invoke code. This is a
+    known and documented property, not an unnoticed one, but it is not a control.
+    Consequence: do not run `call` or `pipeline run` against untrusted source outside a
+    container.
+  evidence:
+  - type: code-survey
+    ref: grep -rn "exec_module|eval(|exec(" spindlebox/
+    observed: exactly 1 hit — spindlebox/dispatch.py:48 spec.loader.exec_module(module)
+    date: 2026-08-03
+  - type: artifact
+    ref: CLAUDE.md "Gotchas"
+    observed: "call_item does a real exec_module of the target file — import-time side effects execute"
+    date: 2026-08-03
+
+- control: AIS-11
+  title: Agents Security Boundaries
+  answer: 'No'
+  ssrm: OSP
+  implementation: >
+    No agent boundary is enforced by this tool, because it defines none: spindlebox is a
+    library and CLI with no autonomous execution loop, no scheduler and no network access.
+    Where it does execute code (AIS-13) it does so with the full privileges of the invoking
+    user. Any boundary is supplied entirely by whatever runs it — a container, a CI job, or
+    the developer's shell — and is therefore outside this subject's control.
+  evidence:
+  - type: code-survey
+    ref: grep -rlE "import (requests|urllib|httpx|socket)" spindlebox/ ; grep -rn "exec_module" spindlebox/
+    observed: no network client; single in-process exec_module at dispatch.py:48, no privilege separation
+    date: 2026-08-03
+
+# ---------------------------------------------------------------- supply chain
+
+- control: STA-09
+  title: Supply Chain Bill of Materials
+  answer: 'No'
+  ssrm: OSP
+  implementation: >
+    No SBOM is produced or published in any format — checked for SECURITY.md, sbom*.json
+    and *.spdx.json at the repository root and found none. WHAT DOES EXIST: all eight
+    runtime dependencies are exact-pinned with `==` in pyproject.toml (tree-sitter and its
+    seven grammar wheels), so the dependency set is precisely determined and reproducible;
+    it simply is not emitted as a consumable bill of materials.
+  evidence:
+  - type: code-survey
+    ref: grep -E '^\s*"tree-sitter' pyproject.toml ; grep -cE '==' pyproject.toml
+    observed: 8 dependencies, all pinned with == (pyproject.toml:10-19)
+    date: 2026-08-03
+  - type: code-survey
+    ref: ls SECURITY.md sbom*.json *.spdx.json
+    observed: no matches
+    date: 2026-08-03
+
+# ---------------------------------------------------------------- audit
+
+- control: A&A-02
+  title: Independent Assessments
+  answer: 'No'
+  ssrm: OSP
+  implementation: >
+    No independent assessment has been performed. This questionnaire is self-assessed by
+    the maintaining party, and the assessment that produced these answers was carried out
+    with the same tooling and by the same operator that maintains the code — explicitly not
+    independent. WHAT DOES EXIST: the project runs an external hardening harness (slamface)
+    whose criteria can fail, and whose run records are retained under
+    slamface/.local/state/ — that is adversarial testing, not independent assessment, and
+    the most recent run is at v1.2.0 against a current version of 1.4.0.
+  evidence:
+  - type: artifact
+    ref: ls slamface/.local/state/score-r-*.json | wc -l ; grep -h spindlebox_version slamface/.local/state/*.json | sort -u
+    observed: 118 run records; newest version present is 1.2.0, current package version is 1.4.0
+    date: 2026-08-03
