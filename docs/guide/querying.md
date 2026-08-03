@@ -70,7 +70,7 @@ Show items by ordinal range, address, or group path, with filters.
 
     spindlebox show [selector] [--project P] [--group G] [--sig-class S]
                     [--lang L] [--name GLOB] [--state-capture SC]
-                    [--deps] [--full] [--json] [--fail-on-stale]
+                    [--deps] [--full] [--json] [--span] [--fail-on-stale]
 
 ### Options
 
@@ -86,7 +86,25 @@ Show items by ordinal range, address, or group path, with filters.
 | `--deps` | flag | off | append a dependency block per item |
 | `--full` | flag | off | full JSON dict per item |
 | `--json` | flag | off | one JSON array of all matches |
+| `--span` | flag | off | `file<TAB>start<TAB>end<TAB>address` per item, for a targeted read |
 | `--fail-on-stale` | flag | off | exit non-zero if a shown item's file changed since indexing |
+
+### Reading one function instead of a whole file
+
+Reading whole files is what exhausts a context budget: a 23,000-byte module costs the same
+whether you needed one function out of it or all forty. `--span` emits exactly the
+coordinates a targeted read needs, so no JSON post-processing is required:
+
+    $ spindlebox show util.io.read_lines --project miniproj_py --span
+    util/io.py	...	...	util.io.read_lines
+
+Feed those to whatever reads a line range — `sed -n "$start,${end}p" "$file"`, an editor, or
+an agent's file-read tool with an offset and limit.
+
+The listing view carries **shape, not meaning**: bodies are hashed and discarded, and `doc`
+holds only the docstring's first line. So `show` tells you what exists and what shape it has;
+the span read is where the actual code comes from. Note that `--full` costs *more* than
+reading the source file outright — it is for schema inspection, not for reading code.
 
 ### Spans and staleness
 

@@ -4,6 +4,7 @@ Regression cover for #15 — 18% of stored spans in an 11-day-old index no longe
 pointed at their declaration, and nothing detected it.
 """
 
+import argparse
 import os
 
 import pytest
@@ -157,6 +158,24 @@ class TestStaleItems:
         index.items.append(extra)
         stale = staleness.stale_items(index, root)
         assert [i.address for i in stale] == ["src.other.g"]
+
+
+class TestSpanOutput:
+    """`show --span` exists so targeted reads never need an ad-hoc JSON pipe."""
+
+    def test_emits_tab_separated_file_start_end_address(self, project, capsys, monkeypatch):
+        from spindlebox import cli
+
+        root, index = project
+        monkeypatch.setattr(cli, "_load_project", lambda args: (index, root))
+        args = argparse.Namespace(
+            selector="src.mod.f", project=None, path=None, group=None,
+            sig_class=None, lang=None, name=None, state_capture=None,
+            span=True, deps=False, full=False, json=False, fail_on_stale=False,
+        )
+        assert cli.cmd_show(args) == 0
+        line = capsys.readouterr().out.strip()
+        assert line.split("\t") == ["src/mod.py", "1", "5", "src.mod.f"]
 
 
 class TestSchemaRoundTrip:

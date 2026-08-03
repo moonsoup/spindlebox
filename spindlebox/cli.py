@@ -206,6 +206,11 @@ def cmd_show(args) -> int:
         print("no items match", file=sys.stderr)
         return 1
     stale_fail = _warn_if_stale(idx, _root, items, getattr(args, "fail_on_stale", False))
+    if getattr(args, "span", False):
+        # exactly what a targeted read needs, without an ad-hoc JSON pipe
+        for item in items:
+            print(f"{item.file}\t{item.span[0]}\t{item.span[1]}\t{item.address}")
+        return 1 if stale_fail else 0
     if args.json:
         print(json.dumps([i.to_dict() for i in items], indent=1))
         return 1 if stale_fail else 0
@@ -529,6 +534,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--deps", action="store_true")
     p.add_argument("--full", action="store_true")
     p.add_argument("--json", action="store_true")
+    p.add_argument("--span", action="store_true",
+                   help="print 'file<TAB>start<TAB>end<TAB>address' for a targeted read")
     p.add_argument("--fail-on-stale", dest="fail_on_stale", action="store_true",
                    help="exit non-zero if a shown item's file changed since indexing")
     p.set_defaults(func=cmd_show)
