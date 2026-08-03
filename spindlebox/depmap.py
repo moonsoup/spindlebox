@@ -100,7 +100,18 @@ def resolve_calls(
     """Map raw called names to intra-index addresses where resolvable.
 
     Resolution: same-module item of that name first, then a globally unique
-    name match; everything else becomes external:<raw>.
+    name match. After that the two remaining cases are deliberately distinct:
+
+    - ``ambiguous:<raw>`` — the name IS defined in this index, more than once,
+      and nothing disambiguates the call site. The edge is real but its target
+      is uncertain, so callers can still treat every same-named item as
+      possibly-called rather than losing the edge outright.
+    - ``external:<raw>`` — the name is not in the index at all: a builtin,
+      a stdlib/third-party call, or a genuine typo.
+
+    Collapsing the first case into the second was the cause of #17. Because
+    ``name`` is the last dotted segment, every class sharing a ``close()``
+    collides, so the discarded edges were concentrated on the commonest names.
     """
     resolved: list[str] = []
     for raw in raw_calls:
@@ -111,6 +122,8 @@ def resolve_calls(
             resolved.append(same_module[0])
         elif len(candidates) == 1:
             resolved.append(candidates[0])
+        elif candidates:
+            resolved.append(f"ambiguous:{raw}")
         else:
             resolved.append(f"external:{raw}")
     seen: set[str] = set()

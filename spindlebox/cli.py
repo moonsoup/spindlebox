@@ -276,11 +276,25 @@ def cmd_deps(args) -> int:
     _warn_if_stale(idx, _root, [item], fail=False)
     if args.reverse:
         callers = [i for i in idx.items if item.address in i.deps.calls]
+        # An `ambiguous:` edge names something this index defines more than once, so the
+        # call is real but its target is uncertain. Reporting these separately keeps the
+        # certain list exact while no longer hiding the edge entirely (#17).
+        possible = [
+            i for i in idx.items
+            if i.address != item.address and i not in callers
+            and any(c.startswith("ambiguous:")
+                    and c[len("ambiguous:"):].rsplit(".", 1)[-1] == item.name
+                    for c in i.deps.calls)
+        ]
         print(f"callers of {item.address}:")
         for c in callers:
             print(_item_line(c))
         if not callers:
             print("  (none in index)")
+        if possible:
+            print(f"possible callers (call named '{item.name}' is ambiguous in this index):")
+            for c in possible:
+                print(_item_line(c))
         return 0
     print(_item_line(item))
     d = item.deps

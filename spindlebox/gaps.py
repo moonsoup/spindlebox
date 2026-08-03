@@ -33,10 +33,27 @@ def _name_tokens(name: str) -> set[str]:
 
 
 def _reverse_call_map(items: list[Item]) -> dict[str, set[str]]:
+    """Callee address -> set of caller addresses.
+
+    An ``ambiguous:`` call names something this index defines more than once, so
+    the edge is real but its target is unknown. Every same-named item is
+    credited as possibly-called: over-crediting risks missing a genuinely dead
+    item, while under-crediting reports live code as dead — and the second error
+    is the one that made `gaps` unusable (#17).
+    """
+    by_name: dict[str, list[str]] = {}
+    for item in items:
+        by_name.setdefault(item.name, []).append(item.address)
+
     callers: dict[str, set[str]] = {}
     for item in items:
         for callee in item.deps.calls:
-            if not callee.startswith("external:"):
+            if callee.startswith("ambiguous:"):
+                name = callee[len("ambiguous:"):].rsplit(".", 1)[-1]
+                for address in by_name.get(name, []):
+                    if address != item.address:
+                        callers.setdefault(address, set()).add(item.address)
+            elif not callee.startswith("external:"):
                 callers.setdefault(callee, set()).add(item.address)
     return callers
 
