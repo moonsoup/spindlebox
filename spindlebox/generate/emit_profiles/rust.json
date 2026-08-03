@@ -188,6 +188,9 @@
     "skeleton_body": [
       "${indent}    todo!()"
     ],
+    "translated_return": [
+      "${indent}    ${expr}"
+    ],
     "skeleton_close": "${indent}}",
     "wrapper_open": [
       "",

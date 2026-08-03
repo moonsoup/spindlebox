@@ -27,6 +27,21 @@ def test_rust_engine_differential(project):
     assert profiled == legacy
 
 
+@pytest.mark.parametrize("project", PROJECTS)
+def test_rust_engine_differential_with_captured_source(project):
+    """Parity must hold for source-carrying indexes too, not just the default ones.
+
+    Body translation (#21) reads `source_text`, which is absent unless `--with-source`
+    was passed — so a translation wired into only ONE of these two backends would still
+    pass the test above while silently diverging in real use. That was briefly the case.
+    """
+    idx = build_index(FIXTURES / project, project_name=project, with_source=True)
+    legacy = {f.relpath: f.content for f in RustBackend().generate(idx, GenOptions())}
+    engine_cls = load_emit_backends()["rust"]
+    profiled = {f.relpath: f.content for f in engine_cls().generate(idx, GenOptions())}
+    assert profiled == legacy
+
+
 def test_rust_backend_stays_legacy():
     # never-remove: 'rust' must keep resolving to the hand-written backend
     assert BACKENDS["rust"] is RustBackend

@@ -20,6 +20,7 @@ from spindlebox.generate.base import (
     squeeze_blanks,
 )
 from spindlebox.schema import Group, Item, ScaIndex
+from spindlebox.translate import translate_body
 
 _RUST_KEYWORDS = {
     # strict (2015 + 2018)
@@ -239,9 +240,18 @@ class RustBackend(GeneratorBackend):
                 params.append(f"{ident}: {rust_type(p.norm_type)}")
             ret = item.signature.returns_norm
             ret_s = "" if ret == "unit" else f" -> {rust_type(ret)}"
+            # Body translation (#21). Kept in step with the emit profile's
+            # `translated_return`, because test_emit_profiles asserts this backend and
+            # the profile engine agree byte-for-byte — and that invariant has to hold
+            # for source-carrying indexes too, not just the default ones.
+            renames = {p.name: ident for p, ident in zip(sig_params, pidents, strict=True)}
+            translated = (translate_body(item, "rust", renames)
+                          if ret != "unit" else None)
+            body = f"{indent}    {translated}" if translated is not None \
+                else f"{indent}    todo!()"
             skeleton = [
                 f"{indent}pub fn {name}({', '.join(params)}){ret_s} {{",
-                f"{indent}    todo!()",
+                body,
                 f"{indent}}}",
             ]
             out.extend(skeleton if options.pretty else flatten_block(skeleton))

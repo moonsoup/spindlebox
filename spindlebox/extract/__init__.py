@@ -64,7 +64,15 @@ def build_index(
     project_name: str | None = None,
     langs: list[str] | None = None,
     old_index: ScaIndex | None = None,
+    with_source: bool = False,
 ) -> ScaIndex:
+    """Build an SPI for `root`.
+
+    `with_source` additionally stores each item's verbatim body on the item. Off by
+    default: it roughly doubles index size and only body translation (#21) reads it.
+    The body is always *locatable* via `file`+`span` regardless; this controls whether
+    it is *captured*.
+    """
     root = Path(root).resolve()
     project_name = project_name or root.name
     lang_list = normalize_langs(langs)
@@ -148,6 +156,9 @@ def build_index(
             ),
             doc=d.doc,
             hash="sha256:" + hashlib.sha256(d.body_text.encode()).hexdigest()[:16],
+            # `hash` above is taken over this same text, so staleness detection
+            # already vouches for it — no separate integrity path needed.
+            source_text=d.body_text if with_source else None,
         )
         raw_calls[address] = d.calls
         items.append(item)

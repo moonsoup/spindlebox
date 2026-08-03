@@ -199,6 +199,9 @@
     "skeleton_body": [
       "${indent}    throw new UnsupportedOperationException(\"TODO\");"
     ],
+    "translated_return": [
+      "${indent}    return ${expr};"
+    ],
     "skeleton_close": "${indent}}",
     "wrapper_open": [
       "",

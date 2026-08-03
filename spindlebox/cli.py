@@ -122,7 +122,7 @@ def cmd_index(args) -> int:
             print(f"warning: existing index unreadable, rebuilding fresh ({e})", file=sys.stderr)
     name = args.name or root.name
     idx = build_index(root, project_name=name, langs=args.langs.split(",") if args.langs else None,
-                      old_index=old)
+                      old_index=old, with_source=getattr(args, "with_source", False))
     errors, warnings = validate_index(idx, strict=args.strict)
     idx.save(index_path)
     if not args.no_register:
@@ -547,6 +547,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--strict", action="store_true", help="'any'-typed signatures are errors")
     p.add_argument("--no-register", action="store_true")
     p.add_argument("--verbose", action="store_true")
+    p.add_argument("--with-source", action="store_true",
+                   help="store each item's body text (needed for body translation)")
     p.set_defaults(func=cmd_index)
 
     p = sub.add_parser("show", help="show items by ordinal range, address, or group path")

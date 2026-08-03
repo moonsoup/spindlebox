@@ -13,7 +13,7 @@ folder — `ls -a`) and registers the project in `~/.spindlebox/registry.json`.
 
 ### Synopsis
 
-    spindlebox index [path] [--name N] [--langs L] [--strict] [--no-register] [--verbose]
+    spindlebox index [path] [--name N] [--langs L] [--strict] [--no-register] [--verbose] [--with-source]
 
 ### Options
 
@@ -25,6 +25,13 @@ folder — `ls -a`) and registers the project in `~/.spindlebox/registry.json`.
 | `--strict` | flag | off | `any`-typed signatures are errors, not warnings |
 | `--no-register` | flag | off | skip the central registry entry |
 | `--verbose` | flag | off | also print per-item validation warnings |
+| `--with-source` | flag | off | also store each item's body text — required for [body translation](generating.md#body-translation) |
+
+`--with-source` roughly doubles index size and nothing but body translation reads
+it, so it is off by default. A body is always *locatable* from `file` + `span`
+regardless; the flag controls whether it is *captured*. The per-item `hash`
+already covers that same text, so staleness detection vouches for it with no
+extra machinery.
 
 ### Use cases
 

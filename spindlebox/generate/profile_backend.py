@@ -29,6 +29,7 @@ from spindlebox.generate.base import (
 )
 from spindlebox.generate.rust_backend import _split_top
 from spindlebox.schema import Group, Item, ScaIndex
+from spindlebox.translate import translate_body
 
 EMIT_DIR = Path(__file__).parent / "emit_profiles"
 
@@ -260,7 +261,19 @@ class ProfileBackend(GeneratorBackend):
             ret_s = T["skeleton_ret_unit"] if is_unit else \
                 _sub(T["skeleton_ret"], type=p.render_type(ret))
             skeleton = [_sub(T["skeleton_open"], params=", ".join(params), ret=ret_s, **ivars)]
-            skeleton += _sub_all(T["skeleton_body"], **ivars)
+            # Body translation (#21) when the source body is provably within the
+            # supported subset AND was captured (`index --with-source`); otherwise the
+            # stub, exactly as before. translate_body refuses rather than guesses, so
+            # None here is the normal case, not a failure.
+            # pidents are the identifiers actually emitted (reserved words escaped,
+            # collisions resolved), so the body must use those, not the source names.
+            renames = {q.name: pid for q, pid in zip(sig_params, pidents, strict=True)}
+            translated = (translate_body(item, self.name, renames)
+                          if not is_unit else None)
+            if translated is not None and T.get("translated_return"):
+                skeleton += _sub_all(T["translated_return"], expr=translated, **ivars)
+            else:
+                skeleton += _sub_all(T["skeleton_body"], **ivars)
             skeleton.append(_sub(T["skeleton_close"], **ivars))
             out.extend(skeleton if options.pretty else flatten_block(skeleton))
             if item.kind == "function":

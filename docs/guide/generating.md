@@ -63,9 +63,60 @@ skeleton and a ctx wrapper per function, op arrays, and any defined pipelines:
   continuously by the project's own test ladder and the
   [`compile-matrix` report](../REPORTING.md)) with every signature, type
   mapping, doc comment, state-capture classification and ctx contract carried
-  over. Function bodies are `todo!()` / `throw UnsupportedOperationException`.
-- **Isn't:** a transpiler. It ports the *shape* so migration becomes mechanical
-  fill-in; it does not translate function bodies.
+  over. Bodies are `todo!()` / `throw UnsupportedOperationException` unless
+  [body translation](#body-translation) applies.
+- **Isn't:** a general transpiler. It ports the *shape* so migration becomes
+  mechanical fill-in, and translates only the narrow slice of bodies it can
+  prove correct — see below for exactly which.
+
+## Body translation
+
+With `spindlebox index --with-source`, `generate` will translate a function body
+instead of stubbing it **when it can prove the result is correct**. Python source
+only, into Rust or Java.
+
+    pure.add(a: int, b: int) -> int:  return a + b
+
+    java   public static Long add(Long a, Long b) { return (a + b); }
+    rust   pub fn add(a: i64, b: i64) -> i64 { (a + b) }
+
+### The rule is: refuse rather than guess
+
+A wrong translation is far worse than an absent one. A stub fails loudly at the
+call site; a mistranslation is a silent defect in ported code. So anything
+outside the provable subset falls back to the stub, and that is the *common*
+case, not a failure.
+
+**Translated:** a single `return <expr>`, optionally after a docstring; int,
+float, bool and str literals; parameter references; `+ - * %` and `//` on
+operands proven numeric from the normalized signature; comparisons; `and`,
+`or`, `not`; unary minus.
+
+**Refused, and why it matters:**
+
+| Construct | Why it is refused |
+|---|---|
+| `/` | Python true-divides (`2/2` is `1.0`); Java and Rust integer-divide. Silently wrong for ints. |
+| `a == b` on strings | Java `==` compares identity, not value. |
+| `a < b < c` | Chained comparison has no direct equivalent. |
+| `%` on floats | Sign and remainder semantics differ across targets. |
+| `str + str` → Rust | Rust's `+` needs `String + &str` in a specific shape. Allowed for Java, where `+` is well-defined. |
+| calls, attributes, subscripts, f-strings, loops, assignments, multiple statements | Not attempted. |
+| anything whose operand types cannot be proven from the signature | No guessing from names. |
+
+Type proof comes from the item's normalized signature, so a body is translated
+only when every leaf resolves to a known core-1 type. This is also why the 54%
+of type slots that normalize to `any` bound how much can ever be translated.
+
+### How it is verified
+
+`tests/test_translate.py` generates Java from a Python fixture, **compiles it,
+runs it, and compares the values to the Python originals executed in-process**.
+Compiling only proves the output parses; matching the values is what makes this
+a claim rather than an aspiration.
+
+Body translation is deliberately narrow today — issue
+[#21](https://github.com/moonsoup/spindlebox/issues/21) tracks widening it.
 - The Rust backend's emit profile is held byte-identical to the original
   hand-written backend by differential test, so profile-driven output is exactly
   as trusted.

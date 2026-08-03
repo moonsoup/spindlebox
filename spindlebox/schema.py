@@ -152,9 +152,16 @@ class Item:
     deps: Deps
     doc: str | None
     hash: str
+    #: Verbatim source of the item's body, captured only when indexing with
+    #: `--with-source`. Default None keeps every existing index byte-identical and
+    #: the file small — a body is always *locatable* from `file`+`span`, this is
+    #: about whether it was *captured*. Body translation needs the text (#21);
+    #: nothing else reads it. `hash` already covers this text, so staleness
+    #: detection vouches for it with no extra machinery.
+    source_text: str | None = None
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "ordinal": self.ordinal, "address": self.address, "name": self.name,
             "kind": self.kind, "language": self.language, "file": self.file,
             "span": list(self.span), "group": self.group,
@@ -163,6 +170,11 @@ class Item:
             "ctx_adapter": self.ctx_adapter.to_dict(), "deps": self.deps.to_dict(),
             "doc": self.doc, "hash": self.hash,
         }
+        # omitted entirely when absent, so indexes built without --with-source are
+        # unchanged on disk
+        if self.source_text is not None:
+            d["source_text"] = self.source_text
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> Item:
@@ -187,6 +199,7 @@ class Item:
             deps=Deps.from_dict(d.get("deps", {})),
             doc=d.get("doc"),
             hash=_req(d, "hash", ctx),
+            source_text=d.get("source_text"),
         )
 
 
