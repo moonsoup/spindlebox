@@ -71,8 +71,12 @@ What blocks end-to-end today, honestly:
    lambdas are rejected by design. Most operational knowledge being migrated is *bash*
    (mount, launchctl, diskutil, ssh), so those procedures cannot become callable items.
 2. **There is no data side.** The SPI indexes *functions*. `ctx_schema` types keys; it does
-   not hold values. A fact store with provenance does not exist, and whether it belongs
-   inside spindlebox or beside it is a genuine design fork — **ask before building it**.
+   not hold values. A fact store with provenance does not exist.
+   **Default: build it as a separate module beside the indexer, not inside it** — that keeps
+   the two reversible and independently testable, and the SPI schema stays about code.
+   Do not stop to ask; build it, record the choice and the reason in the module's own
+   docstring, and let the adversarial judge challenge it. Reverse the decision if the judge
+   makes the case. A wrong architecture call here costs a refactor, not data.
 3. **#17 must be fixed if the adversarial judge consumes `gaps`/`workflows`** — otherwise it
    consumes noise.
 
