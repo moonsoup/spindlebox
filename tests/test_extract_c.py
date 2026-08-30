@@ -333,3 +333,29 @@ def test_a_length_changing_source_hook_is_refused(monkeypatch):
     from spindlebox.extract import profile_lang
     monkeypatch.setitem(profile_lang.HOOKS, "c_ms_call_modifier", lambda s: "")
     assert parse_c("int f(void) { return 1; }")[0].name == "f"
+
+
+def test_label_that_ends_a_block_does_not_lose_the_function():
+    # Ghidra emits `LAB_x:` immediately before a `}` when a jump target lands on
+    # the end of a block. It is not valid C, tree-sitter-c rejects it, and the
+    # whole definition becomes an ERROR node — the function disappears silently.
+    src = ("void f(int a)\n\n{\n  if (a != 0) {\n    goto LAB_004b65de;\n  }\n"
+           "  a = a + 1;\nLAB_004b65de:\n}\n")
+    decls = parse_c(src)
+    assert [d.name for d in decls] == ["f"]
+    assert (decls[0].start_line, decls[0].end_line) == (1, 9)
+
+
+def test_a_switch_default_is_not_turned_into_a_statement():
+    src = ("int f(int a)\n\n{\n  switch (a) {\n  case 1:\n    return 2;\n  default:\n  }\n"
+           "  return 0;\n}\n")
+    decls = parse_c(src)
+    assert [d.name for d in decls] == ["f"]
+    assert "default:" in decls[0].body_text
+
+
+def test_both_fixups_stay_reachable_by_their_own_names():
+    # the composite is what the profile names; neither piece was removed
+    from spindlebox.extract.profile_lang import HOOKS
+    assert set(HOOKS) >= {"c_ms_call_modifier", "c_dangling_label", "c_decompiler_fixups"}
+    assert profile_for("c").raw["source_hook"] == "c_decompiler_fixups"

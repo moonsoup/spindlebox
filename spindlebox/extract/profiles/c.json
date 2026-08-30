@@ -5,7 +5,7 @@
   "walker": true,
   "mode": "nested",
   "boundaries": ["function_definition"],
-  "source_hook": "c_ms_call_modifier",
+  "source_hook": "c_decompiler_fixups",
   "imports": [{"node": "preproc_include", "field": "path", "strip": "\"<>"}],
   "env_patterns": ["getenv\\(\\s*\"([A-Za-z_][A-Za-z0-9_]*)\""],
   "external_imports": {

@@ -842,6 +842,31 @@ def _c_ms_call_modifier(source: str) -> str:
     return _C_MS_CALL_MODIFIER.sub(lambda m: m.group(1) + " " * len(m.group(2)), source)
 
 
+# `LAB_004b65de:` immediately before a `}` is a label with no statement after it,
+# which is not valid C before C23 and which tree-sitter-c rejects outright — the
+# whole enclosing definition becomes an ERROR node. Ghidra emits it whenever a
+# jump target lands on the end of a block. Swapping the colon for a semicolon
+# turns the label into a bare expression statement: same length, parses, and the
+# label itself is dead anyway once the body is being read rather than executed.
+# `default:` is excluded because turning it into a statement would break the
+# switch it belongs to.
+_C_DANGLING_LABEL = re.compile(
+    r"^([ \t]*(?!default\b)[A-Za-z_]\w*):(?=[ \t]*\n[ \t]*\})", re.M
+)
+
+
+@hook("c_dangling_label")
+def _c_dangling_label(source: str) -> str:
+    """Make a label that ends a block into a statement, preserving every offset."""
+    return _C_DANGLING_LABEL.sub(r"\1;", source)
+
+
+@hook("c_decompiler_fixups")
+def _c_decompiler_fixups(source: str) -> str:
+    """Every length-preserving repair decompiled C needs before it will parse."""
+    return _c_dangling_label(_c_ms_call_modifier(source))
+
+
 @hook("c_param")
 def _c_param(walker: ProfileWalker, node, index: int) -> list[RawParam]:
     """One C parameter: type from the `type` field, name from the declarator chain.
