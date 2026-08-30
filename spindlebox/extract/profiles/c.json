@@ -1,0 +1,95 @@
+{
+  "language": "c",
+  "extensions": [".c", ".h"],
+  "grammar": {"module": "tree_sitter_c", "attr": "language", "name": "c"},
+  "walker": true,
+  "mode": "nested",
+  "boundaries": ["function_definition"],
+  "source_hook": "c_ms_call_modifier",
+  "imports": [{"node": "preproc_include", "field": "path", "strip": "\"<>"}],
+  "env_patterns": ["getenv\\(\\s*\"([A-Za-z_][A-Za-z0-9_]*)\""],
+  "external_imports": {
+    "drop_last_segment": true,
+    "stdlib_roots": [
+      "assert", "complex", "ctype", "errno", "fenv", "float", "inttypes", "iso646",
+      "limits", "locale", "math", "setjmp", "signal", "stdalign", "stdarg", "stdatomic",
+      "stdbool", "stddef", "stdint", "stdio", "stdlib", "stdnoreturn", "string",
+      "tgmath", "threads", "time", "uchar", "wchar", "wctype",
+      "dirent", "fcntl", "unistd", "sys", "netinet", "arpa", "pthread", "dlfcn",
+      "sched", "semaphore", "termios", "poll", "regex", "glob", "libgen", "syslog"
+    ]
+  },
+  "calls": {
+    "node": "call_expression",
+    "field": "function",
+    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+    "boundaries": ["function_definition"]
+  },
+  "doc": {"types": ["comment"]},
+  "declare": {
+    "param_fields": ["parameters"],
+    "nodes": {
+      "declaration": {"field": "declarator", "ident_types": ["identifier"]}
+    }
+  },
+  "writes": {
+    "assign": ["assignment_expression"],
+    "assign_field": "left",
+    "assign_idents": "single",
+    "update": ["update_expression"],
+    "update_field": "argument"
+  },
+  "params": {
+    "field": "parameters",
+    "nodes": {
+      "parameter_declaration": {"hook": "c_param"},
+      "variadic_parameter": {"kind": "variadic", "name_literal": "args"}
+    }
+  },
+  "declarations": {
+    "function_definition": {"handler": "c_function"}
+  },
+  "types": {
+    "mode": "table",
+    "unannotated": "i64",
+    "array_suffix": "*",
+    "strip_prefixes": ["const ", "volatile ", "restrict ", "struct ", "union ", "enum "],
+    "simple": {
+      "void": "unit",
+      "void *": "any",
+      "char": "str",
+      "char *": "str",
+      "wchar_t": "str",
+      "wchar_t *": "str",
+      "signed char": "i64",
+      "unsigned char": "i64",
+      "unsigned char *": "bytes",
+      "_Bool": "bool",
+      "bool": "bool",
+      "short": "i64", "short int": "i64", "signed short": "i64",
+      "unsigned short": "i64", "unsigned short int": "i64",
+      "int": "i64", "signed": "i64", "signed int": "i64",
+      "unsigned": "i64", "unsigned int": "i64",
+      "long": "i64", "long int": "i64", "signed long": "i64",
+      "unsigned long": "i64", "unsigned long int": "i64",
+      "long long": "i64", "long long int": "i64",
+      "unsigned long long": "i64", "unsigned long long int": "i64",
+      "float": "f64", "double": "f64", "long double": "f64",
+      "int8_t": "i64", "int16_t": "i64", "int32_t": "i64", "int64_t": "i64",
+      "uint8_t": "i64", "uint16_t": "i64", "uint32_t": "i64", "uint64_t": "i64",
+      "intptr_t": "i64", "uintptr_t": "i64", "ptrdiff_t": "i64",
+      "size_t": "i64", "ssize_t": "i64", "off_t": "i64",
+      "time_t": "i64", "clock_t": "i64", "mode_t": "i64", "pid_t": "i64",
+      "FILE *": "obj:FILE",
+      "undefined": "i64", "undefined1": "i64", "undefined2": "i64",
+      "undefined3": "i64", "undefined4": "i64", "undefined5": "i64",
+      "undefined6": "i64", "undefined7": "i64", "undefined8": "i64",
+      "undefined *": "any",
+      "byte": "i64", "sbyte": "i64", "word": "i64", "dword": "i64", "qword": "i64",
+      "uint": "i64", "uint3": "i64", "uint5": "i64", "uint6": "i64", "uint7": "i64",
+      "ushort": "i64", "ulong": "i64", "longlong": "i64", "ulonglong": "i64",
+      "float10": "f64", "pointer": "any",
+      "code": "fn", "code *": "fn"
+    }
+  }
+}

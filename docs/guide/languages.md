@@ -14,7 +14,7 @@ plus a pinned grammar wheel plus fixtures.
 
 - **An official tree-sitter grammar wheel must exist** for an input language and
   be pinned in `pyproject.toml` (the current pins: `tree-sitter-python`,
-  `-javascript`, `-typescript`, `-go`, `-rust`, `-bash`, `-java`). No wheel →
+  `-javascript`, `-typescript`, `-go`, `-rust`, `-bash`, `-java`, `-c`). No wheel →
   no input language, full stop. Output languages need no grammar at all.
 - **Hooks are the escape hatch, not the norm.** A shared named-hook library
   covers constructs that resist declarative description (e.g. Go's multi-value
@@ -99,6 +99,40 @@ The type table is what makes cross-language signature classes work: Java's
 `readLines(String)` and `read_lines(path: str)` land in the same
 `sig:str->list<str>` class.
 
+The awkward case is `c.json`, and it is worth reading before profiling any
+C-family language, because C breaks two assumptions the walker otherwise makes.
+
+- **The name is not in a field.** `char **split_words(const char *text)` nests
+  as `function_definition → pointer_declarator → pointer_declarator →
+  function_declarator → identifier`, and the parameter list hangs off that
+  nested `function_declarator`. The walker resolves a name by a single field
+  lookup, so C needs the `c_function` hook: it descends the declarator chain to
+  the identifier, walks back up to the `function_declarator` the identifier
+  actually belongs to (which is what makes `int (*get_cb(void))(int)` come out
+  right), and spells the pointer depth back onto the return type.
+- **The grammar cannot parse some real input.** `undefined4 * __cdecl f(x)` is
+  a multiplication to tree-sitter-c, because `undefined4` is not one of its
+  primitive-type keywords — the whole definition collapses into an `ERROR` node
+  and the function vanishes. Ghidra spells nearly every function that way. The
+  profile therefore names a `source_hook`, which is given the file text before
+  it is parsed and blanks the calling convention where it follows a `*`. **A
+  source hook must preserve length**: spans, line numbers and columns all have
+  to keep pointing at the file on disk, and a fixup that changes length is
+  discarded rather than trusted.
+
+C also shows what `state_capture` means in a language with no closures at all:
+`captured` is read as *file scope*, so a function that writes a global or a
+static is `mutates_captured`, one that only reads a global or an enum constant
+is `reads_captured`, and one confined to its own locals, parameters and callees
+is `pure`. On decompiled code that is the cheapest available signal for which
+functions share mutable state.
+
+Two type-table keys exist for C's spelling of types: `strip_prefixes` removes
+leading spellings that carry no type information (`const `, `struct `) before
+every other rule, and `array_suffix: "*"` folds pointer depth, so
+`const struct Rect *` reaches `list<obj:Rect>`. Both are absent — and therefore
+inert — in every other profile.
+
 ## Output languages: anatomy of an emit profile
 
 Emit profiles live in `spindlebox/generate/emit_profiles/<lang>.json`. Keyed to
@@ -156,7 +190,9 @@ the engine earned the right to define Java by reproducing Rust exactly.
 ## Limits
 
 Bash is inherently one signature class (`argv → stdout/exit code`) — correct per
-the model, just degenerate. Untyped dynamic code normalizes to `any`, which
+the model, just degenerate. C has no way to say "function pointer with this
+signature" in core-1, so `int (*fn)(int)` keeps its raw spelling and normalizes
+to `any` rather than to a `fn` that has thrown its arguments away. Untyped dynamic code normalizes to `any`, which
 weakens dedup value (`--strict` surfaces it; the `typing-health` report
 quantifies it). Grammar wheels are pinned to official tree-sitter org packages
 only, and node-type queries are isolated per profile so grammar bumps stay

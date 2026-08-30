@@ -42,6 +42,14 @@ class ProfileWalker:
     def __init__(self, profile: LanguageProfile, rel_path: str, source: str):
         self.p = profile
         self.rel_path = rel_path
+        source_hook = profile.raw.get("source_hook")
+        if source_hook:
+            # A spelling the grammar genuinely cannot parse, blanked before the
+            # parse. The fixup MUST preserve length: every span, line number and
+            # column in the index has to keep pointing at the file on disk. A
+            # fixup that does not is discarded rather than trusted.
+            fixed = HOOKS[source_hook](source)
+            source = fixed if len(fixed) == len(source) else source
         self.source = source
         self.boundaries = set(profile.boundaries)
         self.decls: list[RawDecl] = []
@@ -690,3 +698,215 @@ def _js_function(walker, node, spec, scope, classes, anc_declared, in_func):
     walker._visit(node,
                   [*scope, name if not anonymous else f"anon{node.start_point[0] + 1}"],
                   classes, anc_declared | walker._declared(node), True)
+
+
+# ---- c hooks (the name sits under a declarator chain, not in a direct field) ----
+
+# every node type that can appear as a link in a C declarator chain, i.e.
+# `char **split_words(...)` -> pointer_declarator -> pointer_declarator ->
+# function_declarator -> identifier.
+_C_DECLARATOR_CHAIN = {
+    "init_declarator", "pointer_declarator", "abstract_pointer_declarator",
+    "array_declarator", "abstract_array_declarator",
+    "function_declarator", "abstract_function_declarator",
+    "parenthesized_declarator", "attributed_declarator",
+}
+
+# how to get from a write target back to the variable it lands on
+_C_WRITE_BASE_FIELDS = {
+    "subscript_expression": "argument",   # g[i]
+    "field_expression": "argument",       # g.f and g->f
+    "pointer_expression": "argument",     # *g
+    "cast_expression": "value",           # ((T)g)
+}
+
+
+def _c_inner_declarator(node):
+    """Next link down a C declarator chain: the declarator field, else the nested one.
+
+    `parenthesized_declarator` carries no field, so fall back to its one named child.
+    Using the field where it exists is what keeps an initializer (`= fopen(...)`)
+    out of the walk.
+    """
+    nxt = node.child_by_field_name("declarator")
+    if nxt is not None:
+        return nxt
+    for c in node.named_children:
+        if c.type == "identifier" or c.type in _C_DECLARATOR_CHAIN:
+            return c
+    return None
+
+
+def _c_declarator_identifier(node):
+    """Descend a declarator chain to the identifier it finally names, or None."""
+    cur = node
+    for _ in range(32):
+        if cur is None or cur.type == "identifier":
+            return cur
+        cur = _c_inner_declarator(cur)
+    return None
+
+
+def _c_base_identifier(node):
+    """The variable a write lands on: `g`, `g[i]`, `g->f`, `*g`, `(*g).f` -> `g`."""
+    cur = node
+    for _ in range(32):
+        if cur is None:
+            return None
+        if cur.type == "identifier":
+            return text(cur)
+        field = _C_WRITE_BASE_FIELDS.get(cur.type)
+        if field is not None:
+            cur = cur.child_by_field_name(field)
+        elif cur.type == "parenthesized_expression":
+            cur = cur.named_children[0] if cur.named_children else None
+        else:
+            return None
+    return None
+
+
+def _c_local_names(walker: ProfileWalker, node) -> set[str]:
+    """Names declared in this body — the declarator only, never the initializer.
+
+    Walking the whole `declaration` would also collect the names *read* by an
+    initializer (`int n = g_count;`), and every one of those would then look
+    local, hiding the file-scope state this function actually touches.
+    """
+    body = node.child_by_field_name("body")
+    if body is None:
+        return set()
+    names: set[str] = set()
+    for n in walk_own(body, walker.boundaries):
+        if n.type != "declaration":
+            continue
+        for child in n.named_children:
+            if child.type == "identifier" or child.type in _C_DECLARATOR_CHAIN:
+                ident = _c_declarator_identifier(child)
+                if ident is not None:
+                    names.add(text(ident))
+    return names
+
+
+def _c_state(walker: ProfileWalker, node, params: list[RawParam]) -> str:
+    """C's analogue of capture: does the body reach outside its own frame?
+
+    C has no closures, so `captured` means file scope — a global, a static, an
+    enum constant or an object-like macro. A function that only touches its own
+    locals, parameters and callees is `pure` in the SPI sense.
+    """
+    body = node.child_by_field_name("body")
+    if body is None:
+        return "pure"
+    local = _c_local_names(walker, node) | {p.name for p in params}
+    callees: set[str] = set()
+    mutated: list[str] = []
+    read: list[str] = []
+    for n in walk_own(body, walker.boundaries):
+        if n.type == "call_expression":
+            fn = n.child_by_field_name("function")
+            if fn is not None and fn.type == "identifier":
+                callees.add(text(fn))
+        elif n.type == "assignment_expression":
+            base = _c_base_identifier(n.child_by_field_name("left"))
+            if base:
+                mutated.append(base)
+        elif n.type == "update_expression":
+            base = _c_base_identifier(n.child_by_field_name("argument"))
+            if base:
+                mutated.append(base)
+        elif n.type == "identifier":
+            read.append(text(n))
+    outside = local | callees
+    if any(m not in outside for m in mutated):
+        return "mutates_captured"
+    if any(r not in outside for r in read):
+        return "reads_captured"
+    return "pure"
+
+
+# `T * __cdecl name(...)` is ambiguous to tree-sitter-c whenever T is not one of
+# the grammar's primitive-type keywords: `undefined4 * __cdecl f(x)` parses as a
+# multiplication, the whole definition collapses into an ERROR node, and the
+# function vanishes from the index. Ghidra spells nearly every function that way,
+# so this is not an edge case on decompiled input. The same line without the
+# calling convention parses correctly, so the convention is blanked in exactly
+# that position — it is recorded in the decompiler's own metadata anyway.
+_C_MS_CALL_MODIFIER = re.compile(
+    r"(\*\s*)(__cdecl|__stdcall|__fastcall|__thiscall|__vectorcall|__clrcall)\b"
+)
+
+
+@hook("c_ms_call_modifier")
+def _c_ms_call_modifier(source: str) -> str:
+    """Blank a calling convention that follows a `*`, preserving every offset."""
+    return _C_MS_CALL_MODIFIER.sub(lambda m: m.group(1) + " " * len(m.group(2)), source)
+
+
+@hook("c_param")
+def _c_param(walker: ProfileWalker, node, index: int) -> list[RawParam]:
+    """One C parameter: type from the `type` field, name from the declarator chain.
+
+    Pointer and array depth is spelled back onto the type (`char` + `*`), because
+    in C the declarator carries it and the type field does not. An array parameter
+    decays to a pointer, which is what the language does to it anyway.
+    """
+    base = text(node.child_by_field_name("type"))
+    decl = node.child_by_field_name("declarator")
+    if decl is None:
+        if base == "void":
+            return []                       # `f(void)` is C for "no parameters"
+        return [RawParam(name=f"arg{index}", raw_type=base or None)]
+    stars = 0
+    fn_params: str | None = None
+    cur = decl
+    for _ in range(32):
+        if cur is None or cur.type == "identifier":
+            break
+        if cur.type in ("pointer_declarator", "abstract_pointer_declarator",
+                        "array_declarator", "abstract_array_declarator"):
+            stars += 1
+        elif cur.type in ("function_declarator", "abstract_function_declarator"):
+            plist = cur.child_by_field_name("parameters")
+            fn_params = text(plist) if plist is not None else "()"
+        cur = _c_inner_declarator(cur)
+    name = text(cur) if cur is not None and cur.type == "identifier" else f"arg{index}"
+    if fn_params is not None:                # `int (*fn)(int)` — a function pointer
+        raw = f"{base} (*){fn_params}".strip()
+    elif stars:
+        raw = f"{base} {'*' * stars}".strip()
+    else:
+        raw = base
+    return [RawParam(name=name, raw_type=raw or None)]
+
+
+@hook("c_function")
+def _c_function(walker: ProfileWalker, node, spec, scope, classes, anc_declared, in_func):
+    """A C function definition: `type (pointer_declarator*) function_declarator body`.
+
+    The name is two or more levels down the declarator chain and the parameter
+    list hangs off the `function_declarator`, not off the `function_definition`,
+    so neither can be reached by the walker's direct field lookup.
+    """
+    decl = node.child_by_field_name("declarator")
+    ident = _c_declarator_identifier(decl) if decl is not None else None
+    if ident is None:
+        return
+    fdecl = ident.parent
+    while fdecl is not None and fdecl is not node and fdecl.type != "function_declarator":
+        fdecl = fdecl.parent
+    if fdecl is None or fdecl.type != "function_declarator":
+        return
+    params = walker._params(fdecl)
+    stars = 0
+    cur = fdecl.parent
+    while cur is not None and cur is not node:
+        if cur.type in ("pointer_declarator", "array_declarator"):
+            stars += 1
+        cur = cur.parent
+    base = text(node.child_by_field_name("type"))
+    returns_raw = (f"{base} {'*' * stars}".strip() if stars else base) or None
+    name = text(ident)
+    walker.emit(node, name, "function", scope, classes, params,
+                _c_state(walker, node, params), returns_raw=returns_raw)
+    walker._visit(node, [*scope, name], classes,
+                  anc_declared | walker._declared(node), True)

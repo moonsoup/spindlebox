@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spindlebox"
-version = "1.4.0"
+version = "1.5.0"
 description = "SPIndlebox: the SPIndleframe architecture indexer - empirical Serialized Process Index (SPI), dependency map, and skeleton generator for any codebase."
 requires-python = ">=3.11"
 dependencies = [
@@ -16,6 +16,7 @@ dependencies = [
     "tree-sitter-rust==0.24.2",
     "tree-sitter-bash==0.25.1",
     "tree-sitter-java==0.23.5",
+    "tree-sitter-c==0.24.2",
 ]
 
 [project.optional-dependencies]

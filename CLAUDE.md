@@ -3,7 +3,7 @@
 - **Category**: personal
 - **Path**: `/Users/isme/Software/spindlebox`
 - **GitHub**: moonsoup/spindlebox
-- **Version**: 1.4.0 · **Tests**: 346 pass / 3 skip (cargo absent) · ruff clean
+- **Version**: 1.5.0 · **Tests**: 440 pass / 3 skip (cargo absent) · ruff clean
 
 ## What this is
 

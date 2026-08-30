@@ -287,6 +287,10 @@ def _rust(s: str | None) -> str:
 #   fn_bases / unwrap_bases:  generic base names per core-1 container
 #   generic:        ["<", ">"] bracket pair for generics
 #   array_suffix:   e.g. "[]" -> list<T>  ("byte[]" checked in simple first)
+#   strip_prefixes: leading spellings that carry no type information and are
+#                   removed before every other rule, e.g. C's ["const ",
+#                   "struct "] so `const struct Rect *` reaches `Rect *`.
+#                   Absent (the default) means nothing is stripped.
 #   unannotated:    core-1 type when no annotation is present
 _TYPE_TABLES: dict[str, dict] = {}
 _FIXED_TYPES: dict[str, str] = {}
@@ -303,6 +307,9 @@ def register_fixed(language: str, value: str) -> None:
 
 def _table(s: str, table: dict) -> str:
     s = s.strip()
+    for prefix in table.get("strip_prefixes", ()):
+        while s.startswith(prefix):
+            s = s[len(prefix):].strip()
     if not s:
         return table.get("unannotated", "any")
     simple = table.get("simple", {})

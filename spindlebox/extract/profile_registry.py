@@ -15,6 +15,9 @@ describes everything spindlebox needs to support an input language:
                       normalizer that stays in code
 - ``hooks``           names of functions from the shared hook library for
                       the few genuinely language-specific behaviors
+- ``source_hook``     a hook run over the file text before it is parsed, for
+                      spellings the grammar cannot handle at all; it must
+                      preserve length or every span in the file shifts
 
 Adding a new input language should normally mean adding one JSON profile and
 pinning one grammar wheel — no new Python module.
