@@ -68,17 +68,30 @@ def validate(report: dict) -> None:
                 "check that did not run has to say why, or it reads as a pass")
 
 
-def wrap(results: dict[str, dict]) -> dict:
-    """Several projects' reports as one document, each validated."""
+def wrap(results: dict[str, dict], skipped: list | None = None) -> dict:
+    """Several projects' reports as one document, each validated.
+
+    `skipped` is what could not even be SELECTED -- a registered project whose
+    root has gone. Dropping it would make the run read as though that project
+    were clean, which is the silence this schema exists to prevent.
+    """
     for report in results.values():
         validate(report)
-    return {"schema": SCHEMA, "results": results}
+    out = {"schema": SCHEMA, "results": results}
+    if skipped:
+        out["skipped"] = list(skipped)
+    return out
 
 
-def to_rows(results: dict[str, dict]) -> tuple[list[str], list[dict]]:
+def to_rows(results: dict[str, dict],
+            skipped: list | None = None) -> tuple[list[str], list[dict]]:
     """Findings and skipped checks as table rows, for csv and html."""
     columns = ["project", "state", "check", "summary", "confidence", "files", "evidence"]
     rows: list[dict] = []
+    for entry in skipped or []:
+        rows.append({"project": "", "state": "not selected",
+                     "check": entry.get("check", ""), "summary": entry.get("why", ""),
+                     "confidence": "", "files": 0, "evidence": entry.get("why", "")})
     for project, report in sorted(results.items()):
         for finding in report.get("findings", []):
             rows.append({
@@ -103,12 +116,17 @@ def to_rows(results: dict[str, dict]) -> tuple[list[str], list[dict]]:
     return columns, rows
 
 
-def render(results: dict[str, dict], fmt: str) -> str:
+def render(results: dict[str, dict], fmt: str,
+           skipped: list | None = None) -> str:
     """The findings a person reads, or the document a machine reads."""
     if fmt == "json":
-        return json.dumps(wrap(results), indent=1, sort_keys=True) + "\n"
+        return json.dumps(wrap(results, skipped), indent=1, sort_keys=True) + "\n"
 
     out: list[str] = []
+    for entry in skipped or []:
+        out.append(f"- _not selected_ {entry.get('why')}")
+    if skipped:
+        out.append("")
     for project, report in sorted(results.items()):
         scanned = report.get("scanned")
         read = "" if scanned is None else (

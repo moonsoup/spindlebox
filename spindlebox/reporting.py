@@ -86,7 +86,8 @@ def run_stack(stack: dict, overrides: dict | None = None) -> dict:
 
 @report_op("render.findings", requires={"results", "format"}, provides={"output"})
 def render_findings(ctx):
-    ctx["output"] = findings_model.render(ctx["results"], ctx.get("format", "md"))
+    ctx["output"] = findings_model.render(ctx["results"], ctx.get("format", "md"),
+                                         skipped=ctx.get("skipped"))
     return ctx
 
 
@@ -95,7 +96,7 @@ def render_findings(ctx):
 def findings_to_table(ctx):
     """Flatten findings for the formats that want a grid, keeping the checks
     that did not run as rows of their own rather than dropping them."""
-    columns, rows = findings_model.to_rows(ctx["results"])
+    columns, rows = findings_model.to_rows(ctx["results"], ctx.get("skipped"))
     ctx["title"] = ctx.get("title") or "Findings"
     ctx["columns"], ctx["rows"] = columns, rows
     return ctx

@@ -94,3 +94,38 @@ def test_the_table_op_satisfies_what_render_table_requires() -> None:
     # `format` is seeded by run_stack from the stack's default, not by an op.
     needs = reporting.REPORT_OPS["render.table"]["requires"] - {"format"}
     assert needs <= provides
+
+
+# --- what could not even be selected ----------------------------------------
+
+SELECTION_SKIP = [{"check": "select.projects", "why": "ghost: /gone is gone"}]
+
+
+def test_a_project_that_could_not_be_selected_survives_the_wrapper() -> None:
+    """`select.projects` reports a registered project whose root has gone. If
+    the renderer drops that, the run reads as though the project were clean --
+    the same silence the findings schema exists to prevent."""
+    wrapped = fm.wrap({"alpha": REPORT}, skipped=SELECTION_SKIP)
+    assert wrapped["skipped"] == SELECTION_SKIP
+
+
+def test_nothing_skipped_adds_no_key() -> None:
+    assert "skipped" not in fm.wrap({"alpha": REPORT})
+    assert "skipped" not in fm.wrap({"alpha": REPORT}, skipped=[])
+
+
+def test_the_markdown_says_what_was_not_selected() -> None:
+    out = fm.render({"alpha": REPORT}, "md", skipped=SELECTION_SKIP)
+    assert "ghost" in out and "not selected" in out
+
+
+def test_the_op_carries_selection_skips_through(monkeypatch) -> None:
+    ctx = reporting.REPORT_OPS["render.findings"]["fn"](
+        {"results": {"alpha": REPORT}, "skipped": SELECTION_SKIP, "format": "json"})
+    assert json.loads(ctx["output"])["skipped"] == SELECTION_SKIP
+
+
+def test_the_table_carries_selection_skips_through() -> None:
+    ctx = reporting.REPORT_OPS["findings.to_table"]["fn"](
+        {"results": {"alpha": REPORT}, "skipped": SELECTION_SKIP})
+    assert any(row["state"] == "not selected" for row in ctx["rows"])
