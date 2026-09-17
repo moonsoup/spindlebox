@@ -16,7 +16,8 @@ import io
 import json
 from pathlib import Path
 
-from spindlebox import registry
+from spindlebox import findings_model, registry
+from spindlebox.facts import projects as facts_projects
 from spindlebox.schema import ScaIndex
 
 STACK_DIR = Path(__file__).parent / "reporting_stacks"
@@ -39,6 +40,14 @@ def list_stacks() -> dict[str, dict]:
         data = json.loads(path.read_text())
         out[data["report"]] = data
     return out
+
+
+def all_stacks() -> dict[str, dict]:
+    """The built-in stacks plus every installed plugin's, the latter named
+    `<plugin>:<report>` so a plugin cannot shadow a built-in report."""
+    from spindlebox import plugins
+
+    return {**list_stacks(), **plugins.stacks()}
 
 
 def check_stack(stack: dict) -> list[str]:
@@ -68,6 +77,34 @@ def run_stack(stack: dict, overrides: dict | None = None) -> dict:
     for name in stack["stages"]:
         ctx = REPORT_OPS[name]["fn"](ctx)
     return ctx
+
+
+# ----------------------------------------------------------------- findings
+#
+# Beside the tabular reports: a result shape that can say a check did not run.
+# See findings_model for why a table cannot.
+
+@report_op("render.findings", requires={"results", "format"}, provides={"output"})
+def render_findings(ctx):
+    ctx["output"] = findings_model.render(ctx["results"], ctx.get("format", "md"))
+    return ctx
+
+
+@report_op("findings.to_table", requires={"results"},
+           provides={"title", "columns", "rows"})
+def findings_to_table(ctx):
+    """Flatten findings for the formats that want a grid, keeping the checks
+    that did not run as rows of their own rather than dropping them."""
+    columns, rows = findings_model.to_rows(ctx["results"])
+    ctx["title"] = ctx.get("title") or "Findings"
+    ctx["columns"], ctx["rows"] = columns, rows
+    return ctx
+
+
+@report_op("select.projects", provides={"projects", "skipped"})
+def select_projects(ctx):
+    """Which projects this run is about; see facts.projects for precedence."""
+    return facts_projects.select_projects(ctx)
 
 
 # -------------------------------------------------------------- collectors

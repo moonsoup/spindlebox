@@ -70,6 +70,23 @@ spindlebox install-skill
 installed skill → ~/.claude/skills/spindlebox/SKILL.md
 ```
 
+## spindlebox plugins
+
+What extends this spindlebox, and what tried to and could not. A plugin is
+installed (an entry point in the group `spindlebox.plugins`), never registered
+by editing the tree — see [Plugins](../PLUGINS.md) for the contract. Its reports
+appear in `spindlebox report` as `<plugin>:<report>`.
+
+    $ spindlebox plugins
+    no plugins installed
+
+A plugin that will not import or speaks a different contract version is listed
+as `NOT LOADED` with the reason, and everything else carries on: a plugin
+extends spindlebox and never gets to break it. Set `SPINDLEBOX_PLUGINS=none` to
+ignore installed plugins entirely, or to a comma-separated list to load only
+those — the test suite and these examples set it, so what is documented here
+does not depend on what an operator happens to have installed.
+
 ## The findexer alias
 
 `findexer` is the tool's pre-rebrand name and is kept forever as an identical

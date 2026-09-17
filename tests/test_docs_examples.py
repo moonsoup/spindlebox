@@ -60,7 +60,10 @@ def _run(cmd: str, cwd: Path, home: Path) -> subprocess.CompletedProcess:
     argv = [sys.executable, "-m", "spindlebox", *shlex.split(cmd)[1:]]
     return subprocess.run(argv, cwd=cwd, capture_output=True, text=True,
                           env={"PATH": "/usr/bin:/bin", "SPINDLEBOX_HOME": str(home),
-                               "HOME": str(home)})
+                               "HOME": str(home),
+                               # what the docs promise must not depend on which
+                               # plugins the person running the tests installed
+                               "SPINDLEBOX_PLUGINS": "none"})
 
 
 def _shape_regex(lines: list[str]) -> re.Pattern:
@@ -94,6 +97,7 @@ _CMD_DOCS = {
     "model.md": ["validate", "call", "pipeline"],
     "generating.md": ["generate"],
     "analysis.md": ["gaps", "workflows"],
+    "housekeeping.md": ["projects", "plugins"],
 }
 _FLAG = re.compile(r"`(--[a-z-]+)`")
 

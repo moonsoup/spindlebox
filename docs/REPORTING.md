@@ -54,6 +54,15 @@ Reports read the SPI indexes of **registered projects** — run
 end-to-end and terminates in `output` — a stack that would fail is refused
 before it runs, the same compile-time stance as `spindlebox validate`.
 
+## Plugin reports
+
+An installed plugin's stacks are listed beside the built-in ones as
+`<plugin>:<report>`, so they cannot shadow a built-in name. Plugins also bring
+two ops for results that are findings rather than a table — `render.findings`
+and `findings.to_table`, the latter flattening findings for csv/html while
+keeping the checks that could not run as rows of their own. See
+[Plugins](PLUGINS.md).
+
 ## Add a report in three steps
 
 1. **Reuse first.** If an existing collector computes what you need, your

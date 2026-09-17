@@ -446,7 +446,7 @@ def cmd_generate(args) -> int:
 
 def cmd_report(args) -> int:
     from spindlebox import reporting
-    stacks = reporting.list_stacks()
+    stacks = reporting.all_stacks()
     if args.list or not args.name:
         for name, stack in stacks.items():
             errs = reporting.check_stack(stack)
@@ -511,6 +511,24 @@ def cmd_workflows(args) -> int:
         chain = " → ".join(f["addresses"])
         print(f"[conf {f['confidence']:.2f} str {f['strength']:.2f}] "
               f"({f['stages']} stages) {chain}")
+    return 0
+
+
+def cmd_plugins(args) -> int:
+    """What extends this spindlebox, and what tried to and could not."""
+    from spindlebox import plugins
+
+    found = plugins.loaded()
+    for name, plugin in sorted(found.items()):
+        stacks = sorted(k for k in plugins.stacks() if k.startswith(f"{name}:"))
+        detail = f"api {plugin.api}"
+        if stacks:
+            detail += f", reports: {', '.join(stacks)}"
+        print(f"{name:20s} {detail}")
+    for name, why in plugins.problems():
+        print(f"{name:20s} NOT LOADED: {why}")
+    if not found and not plugins.problems():
+        print("no plugins installed")
     return 0
 
 
@@ -676,10 +694,43 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("install-skill", help="install the spindlebox skill to ~/.claude/skills")
     p.set_defaults(func=cmd_install_skill)
 
+    p = sub.add_parser("plugins", help="what extends this spindlebox")
+    p.set_defaults(func=cmd_plugins)
+
     return parser
 
 
+def _plugin_command(argv: list[str]) -> tuple[str, list[str]] | None:
+    """A plugin's name used as a subcommand, or None.
+
+    THE BUILT-IN COMMANDS ARE MATCHED FIRST and never reach discovery: they are
+    what the read-narrowly rule and other projects' scripts call, and they must
+    not pay for -- or be broken by -- somebody else's plugin import. Only an
+    unrecognised first word is looked up, and only against metadata.
+    """
+    if not argv or argv[0].startswith("-"):
+        return None
+    from spindlebox import plugins
+
+    if argv[0] in plugins.BUILTIN_COMMANDS:
+        return None
+    return (argv[0], argv[1:]) if argv[0] in plugins.names() else None
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    plugin = _plugin_command(argv)
+    if plugin is not None:
+        name, rest = plugin
+        from spindlebox import plugins
+
+        loaded = plugins.loaded().get(name)
+        if loaded is None or loaded.cli is None:
+            why = dict(plugins.problems()).get(name, "provides no subcommand")
+            print(f"spindlebox: plugin {name!r} cannot run: {why}", file=sys.stderr)
+            return 1
+        return loaded.cli(rest)
+
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
