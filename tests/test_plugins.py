@@ -207,3 +207,51 @@ def test_the_reserved_names_are_the_real_commands() -> None:
 
     actions = cli.build_parser()._subparsers._group_actions[0].choices
     assert set(actions) == set(plugins.BUILTIN_COMMANDS)
+
+
+# --- the boundary of "no behaviour change" (#34) -----------------------------
+
+def _list_lines(env_extra=None):
+    import os as _os
+
+    env = {**_os.environ, **(env_extra or {})}
+    done = subprocess.run([sys.executable, "-m", "spindlebox", "report", "--list"],
+                          capture_output=True, text=True, cwd=REPO, env=env)
+    assert done.returncode == 0, done.stderr
+    return [line for line in done.stdout.splitlines() if line.strip()]
+
+
+def test_installing_a_plugin_changes_exactly_one_thing() -> None:
+    """Codex falsified the unqualified claim "no behaviour change to the
+    fifteen built-in commands" in one command: `report --list` gains the
+    plugin's reports, by design. So the claim is stated narrowly here and
+    pinned, because an unqualified claim a reviewer can break in one command
+    invites distrust of the rest.
+
+    What may change: rows under a `<plugin>:` prefix in `report --list`.
+    What may not: any built-in row, in content or order.
+    """
+    without = _list_lines({"SPINDLEBOX_PLUGINS": "none"})
+    with_installed = _list_lines()
+
+    added = [line for line in with_installed if line not in without]
+    for line in added:
+        assert ":" in line.split()[0], (
+            f"a plugin changed a built-in row of `report --list`: {line!r}")
+    # every built-in row survives unchanged and in order
+    assert [line for line in with_installed if line not in added] == without
+
+
+def test_the_quiet_commands_are_untouched_either_way() -> None:
+    """`show`, `index`, `stale` and `projects` never consult plugin metadata;
+    these are what the global read-narrowly rule and other projects' scripts
+    call."""
+    import os as _os
+
+    for args in (["projects", "list"], ["show", "--help"], ["stale", "--help"]):
+        off = subprocess.run([sys.executable, "-m", "spindlebox", *args],
+                             capture_output=True, text=True, cwd=REPO,
+                             env={**_os.environ, "SPINDLEBOX_PLUGINS": "none"})
+        on = subprocess.run([sys.executable, "-m", "spindlebox", *args],
+                            capture_output=True, text=True, cwd=REPO)
+        assert off.stdout == on.stdout, f"{args} differs when a plugin is installed"

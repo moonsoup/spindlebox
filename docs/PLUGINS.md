@@ -63,6 +63,20 @@ ziggurat             NOT LOADED: declares plugin API 2; this spindlebox speaks 1
 Silence is the failure being designed against. A checker whose plugin failed to
 load would report "nothing found" having looked at nothing.
 
+## What installing a plugin *does* change
+
+Exactly one thing, and it is the feature: `spindlebox report --list` gains the
+plugin's reports under its `<plugin>:` prefix, and `spindlebox report
+<plugin>:<name>` runs them. No built-in row changes, in content or order, and
+no other built-in command's output changes at all.
+
+That narrow statement is pinned by `tests/test_plugins.py`
+(`test_installing_a_plugin_changes_exactly_one_thing`,
+`test_the_quiet_commands_are_untouched_either_way`). It replaces an earlier,
+unqualified "no behaviour change to the built-in commands", which an
+independent reviewer falsified in one command (#34) — a claim a reviewer can
+break that easily costs you the credibility of the claims around it.
+
 ## Turning discovery off
 
 `SPINDLEBOX_PLUGINS=none` disables discovery entirely; a comma-separated list

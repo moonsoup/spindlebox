@@ -3,7 +3,7 @@
 - **Category**: personal
 - **Path**: `/Users/isme/Software/spindlebox`
 - **GitHub**: moonsoup/spindlebox
-- **Version**: 1.6.0 · **Tests**: 487 pass / 3 skip (cargo absent) · ruff clean
+- **Version**: 1.6.0 · **Tests**: 489 pass / 3 skip (cargo absent) · ruff clean
 
 ## What this is
 
@@ -22,7 +22,7 @@ Two distinct jobs, both legitimate, and they are easy to confuse:
 ## Working here
 
 ```bash
-python3 -m pytest tests/ -q      # must be 487 passed / 3 skipped
+python3 -m pytest tests/ -q      # must be 489 passed / 3 skipped
 ruff check .                     # must be clean
 ```
 
@@ -41,7 +41,9 @@ both directions. So:
 are `<plugin>:<report>`, built-in command names are reserved and matched first,
 and plugin state lives in `.spi/plugins/<plugin>/` because `index.json` drops
 unknown keys and other projects read it by hand. `SPINDLEBOX_PLUGINS=none`
-disables discovery.
+disables discovery. Installing a plugin changes exactly one thing about the
+built-in commands -- `report --list` gains `<plugin>:<report>` rows -- and that
+boundary is pinned by tests; do not restate it more broadly than that (#34).
 
 ## Gotchas
 
