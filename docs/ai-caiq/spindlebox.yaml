@@ -27,7 +27,7 @@ answers:
 - control: CCC-02
   title: Quality Testing
   answer: 'Yes'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     Every push to main runs ruff and the full pytest suite, and the deploy job declares
     `needs: test`, so nothing ships past a red suite. The workflow also asserts the
@@ -53,7 +53,7 @@ answers:
 - control: CCC-03
   title: Change Management Technology
   answer: 'Yes'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     Changes are tracked in git with GitHub as the system of record: issues carry the
     defect, commits reference the issue, and CI gates the merge. Defects found during this
@@ -68,7 +68,7 @@ answers:
 - control: CCC-04
   title: Unauthorized Change Protection
   answer: 'No'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     The default branch has no branch protection: the GitHub API returns 404 for its
     protection settings, so a direct push to main is possible and no review is required
@@ -87,7 +87,7 @@ answers:
 - control: LOG-12
   title: Transaction/Activity Logging
   answer: 'No'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     No structured logging exists. Zero modules import the logging module; the CLI writes
     human-readable text to stdout/stderr and retains nothing. There is no run identity — no
@@ -108,7 +108,7 @@ answers:
 - control: LOG-10
   title: Audit Records Protection
   answer: 'No'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     There are no audit records to protect (see LOG-12), and the index artifact itself
     carries no integrity binding against tampering: .spi/index.json can be edited after
@@ -129,7 +129,7 @@ answers:
 - control: LOG-03
   title: Security Monitoring and Alerting
   answer: 'No'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     None, and none is wired: there is no daemon, no service, and no network egress to alert
     to. Searched for logging, monitoring, telemetry and alerting integrations across
@@ -150,7 +150,7 @@ answers:
 - control: AIS-13
   title: AI Sandboxing
   answer: 'No'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     `spindlebox call` and `pipeline run` execute code from the INDEXED project in the
     caller's own interpreter, with no sandbox, no allowlist and no isolation boundary.
@@ -174,7 +174,7 @@ answers:
 - control: AIS-11
   title: Agents Security Boundaries
   answer: 'No'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     No agent boundary is enforced by this tool, because it defines none: spindlebox is a
     library and CLI with no autonomous execution loop, no scheduler and no network access.
@@ -192,7 +192,7 @@ answers:
 - control: STA-09
   title: Supply Chain Bill of Materials
   answer: 'No'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     No SBOM is produced or published in any format — checked for SECURITY.md, sbom*.json
     and *.spdx.json at the repository root and found none. WHAT DOES EXIST: all eight
@@ -214,7 +214,7 @@ answers:
 - control: A&A-02
   title: Independent Assessments
   answer: 'No'
-  ssrm: OSP
+  ssrm: Owned by OSP
   implementation: >
     No independent assessment has been performed. This questionnaire is self-assessed by
     the maintaining party, and the assessment that produced these answers was carried out
