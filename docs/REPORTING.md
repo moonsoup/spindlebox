@@ -31,6 +31,7 @@ Formats: `md` (default) · `csv` · `html` · `json`. Every report accepts
 | `compile-matrix` | Which projects generate into which output languages? |
 | `score-history` | Every hardening-harness run, scored and versioned. |
 | `profile-coverage` | Which declared language-profile constructs the test fixtures exercise — the gate in the [add-a-language checklist](guide/languages.md). |
+| `catalog` | A project's own curated list (`<root>/spindle/<name>.catalog.json`) joined to its index: every selected item is classified, ignored, or flagged UNCLASSIFIED; entries whose code is gone are STALE. Run with `--ctx '{"catalog": "<name>"}'`. |
 
 Reports read the SPI indexes of **registered projects** — run
 `spindlebox index <path>` first; `--project` names one, otherwise all.

@@ -124,6 +124,74 @@ def _iter_indexes(ctx) -> list[tuple[str, ScaIndex]]:
     return out
 
 
+@report_op("collect.catalog", requires={"catalog"}, provides={"title", "columns", "rows"})
+def collect_catalog(ctx):
+    """A project's curated list joined to its live index.
+
+    The catalog lives with the project (`<root>/spindle/<name>.catalog.json`, or ctx `catalog_path`):
+    a `select` (file globs, kinds, optional name regex) says which items MUST be classified, and
+    `entries` classify them by address with the catalog's `fields`. Every selected item without an
+    entry is UNCLASSIFIED, every entry whose address is gone is STALE, so the list cannot quietly
+    fall behind the code. `ignore` names selected items that deliberately need no entry.
+    """
+    import fnmatch
+    import re
+
+    name = ctx.get("catalog")
+    if not name:
+        raise ValueError("catalog report needs ctx 'catalog' (the catalog name)")
+    wanted = ctx.get("project")
+    rows, fields_all = [], []
+    counts = {"classified": 0, "UNCLASSIFIED": 0, "STALE": 0, "ignored": 0}
+    title = name
+    for proj, entry in sorted(registry.list_projects().items()):
+        if wanted and proj != wanted:
+            continue
+        root = Path(entry.get("root", "."))
+        path = Path(ctx["catalog_path"]) if ctx.get("catalog_path") else root / "spindle" / f"{name}.catalog.json"
+        if not path.is_file():
+            rows.append({"project": proj, "status": "NO CATALOG", "address": "", "where": str(path)})
+            continue
+        cat = json.loads(path.read_text())
+        title = cat.get("title", name)
+        fields = list(cat.get("fields", []))
+        fields_all += [f for f in fields if f not in fields_all]
+        sel = cat.get("select", {})
+        globs, excl = sel.get("files", ["*"]), sel.get("exclude_files", [])
+        kinds = set(sel.get("kinds", ["function", "method"]))
+        name_re = re.compile(sel["names"]) if sel.get("names") else None
+        idx_path = Path(entry["index"])
+        items = ScaIndex.from_dict(json.loads(idx_path.read_text())).items if idx_path.exists() else []
+        by_addr = {it.address: it for it in items}
+        entries, ignore = cat.get("entries", {}), cat.get("ignore", {})
+        for it in items:
+            if it.kind not in kinds or not any(fnmatch.fnmatch(it.file, g) for g in globs):
+                continue
+            if any(fnmatch.fnmatch(it.file, g) for g in excl) or (name_re and not name_re.search(it.name)):
+                continue
+            where = f"{it.file}:{it.span[0]}"
+            if it.address in entries:
+                status = "classified"
+            elif it.address in ignore:
+                status = "ignored"
+            else:
+                status = "UNCLASSIFIED"
+            counts[status] += 1
+            row = {"project": proj, "status": status, "address": it.address, "where": where}
+            row.update({f: entries.get(it.address, {}).get(f, ignore.get(it.address, "") if f == fields[0] and status == "ignored" else "")
+                        for f in fields})
+            rows.append(row)
+        for addr, e in entries.items():
+            if addr not in by_addr:
+                counts["STALE"] += 1
+                rows.append({"project": proj, "status": "STALE", "address": addr, "where": "(not in index)", **{f: e.get(f, "") for f in fields}})
+    order = {"UNCLASSIFIED": 0, "STALE": 1, "NO CATALOG": 2, "classified": 3, "ignored": 4}
+    rows.sort(key=lambda r: (order.get(r["status"], 9), r.get(fields_all[0], "") if fields_all else "", r["address"]))
+    summary = " · ".join(f"{n} {k}" for k, n in counts.items() if n or k == "classified")
+    ctx.update(title=f"{title} — {summary}", columns=["project", "status", "address", "where", *fields_all], rows=rows)
+    return ctx
+
+
 @report_op("collect.typing_health", requires=set(), provides={"title", "columns", "rows"})
 def collect_typing_health(ctx):
     """Where 'any' hides: untyped fraction per project, worst files named."""

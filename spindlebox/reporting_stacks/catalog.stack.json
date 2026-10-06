@@ -1,0 +1,7 @@
+{
+  "report": "catalog",
+  "description": "A project's curated list joined to its index: classified, UNCLASSIFIED, STALE",
+  "stages": ["collect.catalog", "render.table"],
+  "ctx": {"project": null, "catalog": null},
+  "default_format": "md"
+}

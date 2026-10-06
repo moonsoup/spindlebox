@@ -115,3 +115,44 @@ def test_compile_matrix_surfaces_backend_failure(two_projects, monkeypatch):
     rows = json.loads(ctx["output"])["rows"]
     assert rows and all(r["boom"] == "FAIL: RuntimeError" for r in rows)
     assert all(r["rust"].startswith("ok") for r in rows)  # healthy backends unaffected
+
+
+# ------------------------------------------------------------ catalog report
+
+def _write_catalog(root, name, cat):
+    d = root / "spindle"
+    d.mkdir(exist_ok=True)
+    (d / f"{name}.catalog.json").write_text(json.dumps(cat))
+
+
+def test_catalog_joins_entries_and_flags_unclassified_and_stale(two_projects):
+    root = two_projects / "miniproj_py"
+    _write_catalog(root, "risk", {
+        "title": "Risky functions",
+        "select": {"files": ["pure.py"], "kinds": ["function"]},
+        "fields": ["level"],
+        "entries": {"pure.add": {"level": "low"}, "pure.gone": {"level": "high"}},
+        "ignore": {"pure.reserved": "fixture oddity"},
+    })
+    stack = reporting.list_stacks()["catalog"]
+    ctx = reporting.run_stack(stack, {"project": "miniproj_py", "catalog": "risk", "format": "json"})
+    rows = {r["address"]: r for r in json.loads(ctx["output"])["rows"]}
+    assert rows["pure.add"]["status"] == "classified" and rows["pure.add"]["level"] == "low"
+    assert rows["pure.greet"]["status"] == "UNCLASSIFIED", "selected but nobody has reviewed it"
+    assert rows["pure.gone"]["status"] == "STALE", "entry whose code no longer exists"
+    assert rows["pure.reserved"]["status"] == "ignored"
+    assert "app.home" not in rows, "outside the selection"
+    assert "1 classified" in ctx["title"] and "UNCLASSIFIED" in ctx["title"]
+
+
+def test_catalog_without_a_name_is_refused(two_projects):
+    stack = reporting.list_stacks()["catalog"]
+    with pytest.raises(ValueError, match="catalog"):
+        reporting.run_stack(stack, {"project": "miniproj_py"})
+
+
+def test_catalog_missing_file_is_reported_not_silent(two_projects):
+    stack = reporting.list_stacks()["catalog"]
+    ctx = reporting.run_stack(stack, {"project": "miniproj_py", "catalog": "nope", "format": "json"})
+    rows = json.loads(ctx["output"])["rows"]
+    assert rows and rows[0]["status"] == "NO CATALOG"
