@@ -3,7 +3,7 @@
 - **Category**: personal
 - **Path**: `/Users/isme/Software/spindlebox`
 - **GitHub**: moonsoup/spindlebox
-- **Version**: 1.6.0 · **Tests**: 489 pass / 3 skip (cargo absent) · ruff clean
+- **Version**: 1.6.0 · **Tests**: 663 pass / 3 skip (cargo absent) · ruff clean
 
 ## What this is
 
@@ -22,7 +22,7 @@ Two distinct jobs, both legitimate, and they are easy to confuse:
 ## Working here
 
 ```bash
-python3 -m pytest tests/ -q      # must be 489 passed / 3 skipped
+python3 -m pytest tests/ -q      # must be 663 passed / 3 skipped
 ruff check .                     # must be clean
 ```
 
