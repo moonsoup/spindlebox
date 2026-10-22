@@ -24,6 +24,9 @@ describes everything spindlebox needs to support an input language:
                       ``external:`` and are listed on ``deps.stdlib_calls``
 - ``entry_points``    ``names`` / ``prefixes`` / ``file_contains`` that make an
                       item an entry point; extraction stamps the reason on it
+- ``meta``            how functions used as values look in the language: one
+                      entry per name in ``CONSTRUCTS``, each either a spec or
+                      ``{"absent": "<why>"}`` -- never left out (#39)
 
 Adding a new input language should normally mean adding one JSON profile and
 pinning one grammar wheel — no new Python module.
@@ -178,3 +181,43 @@ def entry_point_reason(rule: dict, name: str, file: str) -> str | None:
         if part.lower() in lowered:
             return f"file:{part}"
     return None
+
+
+#: The function-as-value constructs a profile's ``meta`` block must declare,
+#: each either as a spec or as ``{"absent": "<why>"}`` (#39):
+#:
+#: - ``decorators``   decorators, annotations, attributes -> ``item.decorators``
+#: - ``parent``       a function nested in another -> ``item.parent``
+#: - ``takes_fn``     a parameter that is a callable -> ``item.takes_fn``
+#: - ``returns_fn``   a callable is returned -> ``item.returns_fn``
+#: - ``param_calls``  ``f(x)`` with ``f`` a parameter -> call ``param:f``
+#: - ``table_calls``  ``T[k](x)`` -> call ``table:<address of T>``
+CONSTRUCTS = ("decorators", "parent", "takes_fn", "returns_fn", "param_calls", "table_calls")
+
+
+def meta_for(language: str) -> dict:
+    """A language's ``meta`` block: construct name -> spec, or ``{"absent": why}``.
+
+    Profiled languages declare it in their JSON; Python's lives beside its native
+    extractor. A language spindlebox does not know has none, so declares nothing.
+    """
+    prof = all_profiles().get(language)
+    if prof is not None and prof.raw.get("meta"):
+        return dict(prof.raw["meta"])
+    if language == "python":
+        from spindlebox.extract.py_lang import PY_META
+        return dict(PY_META)
+    return {}
+
+
+def meta_spec(language: str, construct: str) -> dict | None:
+    """The spec for one construct, or None when the language declares it absent."""
+    spec = meta_for(language).get(construct)
+    if spec is None or "absent" in spec:
+        return None
+    return spec
+
+
+def declared_constructs(language: str) -> list[str]:
+    """The ``CONSTRUCTS`` a language declares present, in ``CONSTRUCTS`` order."""
+    return [c for c in CONSTRUCTS if meta_spec(language, c) is not None]

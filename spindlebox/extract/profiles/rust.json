@@ -47,5 +47,13 @@
     "function_item": {"handler": "rust_function_item"},
     "closure_expression": {"handler": "rust_closure"}
   },
-  "is_async_hook": "rust_is_async"
+  "is_async_hook": "rust_is_async",
+  "meta": {
+    "decorators": {"siblings": ["attribute_item"], "strip": ["^#\\[", "\\]$"]},
+    "parent": {},
+    "takes_fn": {"fn_types": ["\\b(Fn|FnMut|FnOnce)\\s*\\(", "(^|[^\\w])fn\\s*\\("]},
+    "returns_fn": {"fn_types": ["\\b(Fn|FnMut|FnOnce)\\s*\\(", "(^|[^\\w])fn\\s*\\("], "return_nodes": ["return_expression"]},
+    "param_calls": {},
+    "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "index_expression", "object": null}]}
+  }
 }

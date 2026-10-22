@@ -55,6 +55,21 @@ case is `go.json`; every key below is quoted from it.
   conventions live beside its native extractor. The index lists the markers it
   carries in `project.markers`; `gaps` trusts a marker only when it is listed
   there, and falls back to its old heuristics for an older index.
+  A `"meta"` block says how functions used as values look in the language
+  (#39). It must name all six constructs, each either as a spec or as
+  `{"absent": "<why>"}` -- a construct is never left out and defaulted:
+  `decorators` (decorators, annotations, attributes, stored on the item with
+  the sigil stripped: `staticmethod`, `Deprecated`, `inline`), `parent` (the
+  address of the item a nested function sits in), `takes_fn` and `returns_fn`
+  (a parameter or return value is a callable: typed as one per `fn_types`,
+  called through, or a nested function handed back), `param_calls` (`f(x)`
+  with `f` a parameter is the call edge `param:f`, never a name match) and
+  `table_calls` (calling the element `T[k]` is `table:<address of T>`: the item that declares
+  `T`, the class for a receiver's `self.T`, else the module). Go declares no
+  decorators and Java no table calls; Bash has only `parent`. Python's block
+  lives beside its native extractor. The index lists, per language, the
+  constructs it declares in `project.constructs`; the item fields are omitted
+  when empty.
   An `external_imports` rule may name its `"separators"` (`["::"]`, `["/"]`)
   when import paths are not dotted; without it the rule splits on `.` exactly as
   before. `boundaries` are the node types that open a new function

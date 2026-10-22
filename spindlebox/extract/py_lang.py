@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import re
 import symtable
 
 from spindlebox.extract.base import RawDecl, RawParam
@@ -24,6 +25,19 @@ PY_ENTRY_POINTS = {
     "file_contains": ["test"],
 }
 
+#: Python's ``meta`` block, in the shape a profile's takes (#39). Every construct
+#: is present; the native extractor reads the AST directly, so the specs only
+#: carry what is data: the type spellings that mean "a callable".
+PY_META = {
+    "decorators": {"source": "decorator_list"},
+    "parent": {},
+    "takes_fn": {"fn_types": [r"\bCallable\b"]},
+    "returns_fn": {"fn_types": [r"\bCallable\b"]},
+    "param_calls": {},
+    "table_calls": {},
+}
+_FN_TYPES = [re.compile(t) for t in PY_META["takes_fn"]["fn_types"]]
+
 
 def _dotted(node: ast.expr) -> str | None:
     if isinstance(node, ast.Name):
@@ -43,14 +57,55 @@ def _walk_own(node: ast.AST, *, skip_nested: bool = True):
         yield from _walk_own(child, skip_nested=skip_nested)
 
 
-def _collect_calls(func: ast.AST) -> list[str]:
+def _collect_calls(func: ast.AST, param_names: set[str] | None = None) -> list[str]:
+    """Called names in ``func``'s own body.
+
+    With ``param_names`` (indexing with ``meta``), a call through a parameter is
+    ``param:<name>`` and a call through a subscript, ``T[k](x)``, is
+    ``table:<T>`` -- before #39 the second was silently dropped, because
+    ``_dotted`` has no spelling for it. Without it the output is unchanged.
+    """
     calls = []
     for n in _walk_own(func):
         if isinstance(n, ast.Call):
             name = _dotted(n.func)
+            if param_names is not None:
+                if isinstance(n.func, ast.Name) and name in param_names:
+                    name = f"param:{name}"
+                elif isinstance(n.func, ast.Subscript):
+                    table = _dotted(n.func.value)
+                    name = f"table:{table}" if table else None
             if name and name not in calls:
                 calls.append(name)
     return calls
+
+
+def _nested_defs(func: ast.AST):
+    """The function and lambda nodes defined directly in ``func``'s own body."""
+    for child in ast.iter_child_nodes(func):
+        if isinstance(child, (*_FUNC_NODES, ast.Lambda)):
+            yield child
+        elif not isinstance(child, ast.ClassDef):
+            yield from _nested_defs(child)
+
+
+def _returns_fn(func: ast.AST) -> bool:
+    """Is a callable returned: by annotation, or by handing back a nested function?"""
+    if isinstance(func, ast.Lambda):
+        return isinstance(func.body, ast.Lambda)
+    if func.returns is not None and any(t.search(ast.unparse(func.returns)) for t in _FN_TYPES):
+        return True
+    nested = {d.name for d in _nested_defs(func) if not isinstance(d, ast.Lambda)}
+    for n in _walk_own(func):
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Lambda):
+            nested.update(t.id for t in n.targets if isinstance(t, ast.Name))
+    for n in _walk_own(func):
+        if isinstance(n, ast.Return) and n.value is not None:
+            if isinstance(n.value, ast.Lambda):
+                return True
+            if isinstance(n.value, ast.Name) and n.value.id in nested:
+                return True
+    return False
 
 
 def _self_name(func: ast.AST) -> str | None:
@@ -132,7 +187,10 @@ def _params(func: ast.AST, is_method: bool) -> list[RawParam]:
     return params
 
 
-def extract_python_file(rel_path: str, source: str) -> list[RawDecl]:
+def extract_python_file(rel_path: str, source: str, meta: bool = False) -> list[RawDecl]:
+    """``meta`` adds what #39 records about functions used as values (decorators,
+    parent, takes_fn, returns_fn, ``param:``/``table:`` calls); the default
+    output is unchanged."""
     tree = ast.parse(source)
     try:
         func_tables = _symtable_functions(source, rel_path)
@@ -173,6 +231,20 @@ def extract_python_file(rel_path: str, source: str) -> list[RawDecl]:
         classes.reverse()
         return chain, classes, nearest
 
+    def enclosing_funcs(node: ast.AST):
+        """Function and lambda nodes enclosing ``node``, innermost first."""
+        p = parents.get(node)
+        while p is not None:
+            if isinstance(p, (*_FUNC_NODES, ast.Lambda)):
+                yield p
+            p = parents.get(p)
+
+    def local_names(func: ast.AST) -> set[str]:
+        table = func_tables.get(
+            ("lambda" if isinstance(func, ast.Lambda) else func.name, func.lineno))
+        return set(table.get_locals()) if table else set()
+
+    decl_of: dict[ast.AST, RawDecl] = {}
     decls: list[RawDecl] = []
     for node in ast.walk(tree):
         if not isinstance(node, (*_FUNC_NODES, ast.Lambda)):
@@ -208,7 +280,10 @@ def extract_python_file(rel_path: str, source: str) -> list[RawDecl]:
             else:
                 state = "pure"
 
-        decls.append(RawDecl(
+        params = _params(node, kind == "method")
+        param_names = {p.name for p in params if p.kind != "receiver"} if meta else None
+        calls = _collect_calls(node, param_names)
+        decl = RawDecl(
             name=name,
             kind=kind,
             language="python",
@@ -217,7 +292,7 @@ def extract_python_file(rel_path: str, source: str) -> list[RawDecl]:
             end_line=getattr(node, "end_lineno", node.lineno),
             scope_chain=chain,
             class_chain=classes,
-            params=_params(node, kind == "method"),
+            params=params,
             returns_raw=(
                 ast.unparse(node.returns) if not is_lambda and node.returns else None
             ),
@@ -228,8 +303,33 @@ def extract_python_file(rel_path: str, source: str) -> list[RawDecl]:
                 else None
             ),
             body_text=ast.get_source_segment(source, node) or "",
-            calls=_collect_calls(node),
+            calls=calls,
             imports=list(imports),
             state_capture=state,
-        ))
+        )
+        if meta:
+            receiver = next((p.name for p in params if p.kind == "receiver"), None)
+            for call in calls:
+                if not call.startswith("table:"):
+                    continue
+                root = call[len("table:"):].split(".", 1)[0]
+                if root == receiver:
+                    decl.table_scopes[call] = ("receiver", None)
+                elif root in local_names(node):
+                    decl.table_scopes[call] = ("item", decl)
+                else:
+                    owner = next((f for f in enclosing_funcs(node) if root in local_names(f)), None)
+                    # enclosing functions are walked (and recorded) before nested ones
+                    decl.table_scopes[call] = (
+                        ("item", decl_of[owner]) if owner in decl_of else ("module", None))
+            parent = next(enclosing_funcs(node), None)
+            decl.parent = decl_of.get(parent) if parent is not None else None
+            if not is_lambda:
+                decl.decorators = [ast.unparse(d) for d in node.decorator_list]
+            decl.takes_fn = any(
+                p.raw_type and any(t.search(p.raw_type) for t in _FN_TYPES) for p in params
+            ) or any(c.startswith("param:") for c in calls)
+            decl.returns_fn = _returns_fn(node)
+        decl_of[node] = decl
+        decls.append(decl)
     return decls

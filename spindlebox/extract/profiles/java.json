@@ -102,5 +102,13 @@
     "iter_bases": ["Iterator", "Iterable", "Stream", "IntStream", "LongStream", "DoubleStream", "Enumeration"],
     "fn_bases": ["Function", "BiFunction", "Supplier", "Consumer", "BiConsumer", "Predicate", "BiPredicate", "UnaryOperator", "BinaryOperator", "Callable"],
     "unwrap_bases": ["CompletableFuture", "Future", "AtomicReference"]
+  },
+  "meta": {
+    "decorators": {"within": {"modifiers": ["annotation", "marker_annotation"]}, "strip": ["^@"]},
+    "parent": {},
+    "takes_fn": {"fn_types": ["\\b(Function|BiFunction|Supplier|Consumer|BiConsumer|Predicate|BiPredicate|UnaryOperator|BinaryOperator|Runnable|Callable)\\b"]},
+    "returns_fn": {"fn_types": ["\\b(Function|BiFunction|Supplier|Consumer|BiConsumer|Predicate|BiPredicate|UnaryOperator|BinaryOperator|Runnable|Callable)\\b"], "return_nodes": ["return_statement"]},
+    "param_calls": {"member": {"object": "object", "fn_types": ["\\b(Function|BiFunction|Supplier|Consumer|BiConsumer|Predicate|BiPredicate|UnaryOperator|BinaryOperator|Runnable|Callable)\\b"]}},
+    "table_calls": {"absent": "Java cannot call an element directly: T[k](x) is not valid Java. T[k].apply(x) is a method call on the element, and without the element's type it cannot be told from any other method call on an array element."}
   }
 }

@@ -18,6 +18,7 @@ from spindlebox.extract.base import (
 )
 from spindlebox.extract.profile_registry import (
     builtins_for,
+    declared_constructs,
     entry_point_reason,
     entry_points_for,
     stdlib_calls_for,
@@ -27,8 +28,15 @@ from spindlebox.sigclass import build_signature_classes, partition_op_arrays, si
 from spindlebox.staleness import snapshot_files
 from spindlebox.typenorm import normalize
 
-#: Every marker ``build_index`` writes. See ``ScaIndex.markers``.
-INDEX_MARKERS = ("builtin_calls", "stdlib_calls", "entry_points")
+#: Every marker ``build_index`` writes. See ``ScaIndex.markers``. The last six
+#: are the function-as-value constructs of #39; which of them each language
+#: has is in ``ScaIndex.constructs``.
+INDEX_MARKERS = ("builtin_calls", "stdlib_calls", "entry_points",
+                 "decorators", "parent", "takes_fn", "returns_fn",
+                 "param_calls", "table_calls")
+
+#: Call markers extraction resolves itself; ``resolve_calls`` never sees them.
+_INDIRECT_CALLS = ("param:", "table:")
 
 
 def _extract_file(lang: str, rel: str, source: str) -> list[RawDecl]:
@@ -36,10 +44,10 @@ def _extract_file(lang: str, rel: str, source: str) -> list[RawDecl]:
     prof = profile_for(lang)
     if prof is not None and prof.walker:
         from spindlebox.extract.profile_lang import extract_with_profile
-        return extract_with_profile(prof, rel, source)
+        return extract_with_profile(prof, rel, source, meta=True)
     if lang == "python":
         from spindlebox.extract.py_lang import extract_python_file
-        return extract_python_file(rel, source)
+        return extract_python_file(rel, source, meta=True)
     if lang in ("javascript", "typescript"):
         from spindlebox.extract.js_lang import extract_js_file
         return extract_js_file(rel, source, lang)
@@ -115,6 +123,7 @@ def build_index(
     items: list[Item] = []
     raw_calls: dict[str, list[str]] = {}
     used_addresses: set[str] = set()
+    address_of: dict[int, str] = {}      # id(RawDecl) -> address, for parent/table
     for d in decls:
         address = make_address(d.file, d.scope_chain, d.name, d.start_line)
         if address in used_addresses:
@@ -127,6 +136,7 @@ def build_index(
                 n += 1
             address = f"{address}~{n}"
         used_addresses.add(address)
+        address_of[id(d)] = address
 
         params = [
             Param(
@@ -169,9 +179,21 @@ def build_index(
             # already vouches for it — no separate integrity path needed.
             source_text=d.body_text if with_source else None,
             entry_point=entry_point_reason(entry_points_for(d.language), d.name, d.file),
+            decorators=list(d.decorators),
+            takes_fn=d.takes_fn,
+            returns_fn=d.returns_fn,
         )
         raw_calls[address] = d.calls
         items.append(item)
+
+    # a nested item's parent, and the address of each table a call goes through,
+    # can only be named once every address is known (#39)
+    for d, item in zip(decls, items, strict=True):
+        if d.parent is not None:
+            item.parent = address_of.get(id(d.parent))
+        raw_calls[item.address] = [
+            _table_address(c, d, item, address_of) if c.startswith("table:") else c
+            for c in raw_calls[item.address]]
 
     old_map = {i.address: i.ordinal for i in old_index.items} if old_index else {}
     old_retired = list(old_index.retired_ordinals) if old_index else []
@@ -182,8 +204,11 @@ def build_index(
     for item in items:
         addresses_by_name.setdefault(item.name, []).append(item.address)
     for item in items:
-        item.deps.calls = resolve_calls(raw_calls[item.address], item.group, addresses_by_name,
-                                        builtins=builtins_for(item.language))
+        raw = raw_calls[item.address]
+        item.deps.calls = resolve_calls(
+            [c for c in raw if not c.startswith(_INDIRECT_CALLS)], item.group,
+            addresses_by_name, builtins=builtins_for(item.language),
+        ) + list(dict.fromkeys(c for c in raw if c.startswith(_INDIRECT_CALLS)))
         stdlib = stdlib_calls_for(item.language)
         item.deps.stdlib_calls = sorted({
             c[len("external:"):] for c in item.deps.calls
@@ -207,10 +232,26 @@ def build_index(
         files=snapshot_files(root, read_files),
         # the neutral markers this build wrote; `gaps` trusts only what is listed (#38)
         markers=list(INDEX_MARKERS),
+        constructs={lang: declared_constructs(lang)
+                    for lang in sorted({i.language for i in items})},
     )
     if errors:
         index.parse_errors = errors  # serialized: an index must never hide skipped files
     return index
+
+
+def _table_address(call: str, d: RawDecl, item: Item, address_of: dict[int, str]) -> str:
+    """``table:<name>`` -> ``table:<address of the table>``, from where extraction
+    found ``<name>`` declared: an item (``<item address>.<name>``), the receiver
+    (``<module>.<class chain>.<rest>``) or, failing both, the module."""
+    name = call[len("table:"):]
+    where, owner = d.table_scopes.get(call, ("module", None))
+    if where == "item" and owner is not None and id(owner) in address_of:
+        return f"table:{address_of[id(owner)]}.{name}"
+    if where == "receiver":
+        rest = name.split(".", 1)[1] if "." in name else name
+        return "table:" + ".".join([*module_parts(d.file), *d.class_chain, rest])
+    return "table:" + ".".join([*module_parts(d.file), name])
 
 
 def _build_groups(items: list[Item]) -> list[Group]:

@@ -67,6 +67,16 @@ class RawDecl:
     calls: list[str] = field(default_factory=list)
     imports: list[str] = field(default_factory=list)
     state_capture: str = "pure"
+    # functions used as values (#39); left at these defaults when the
+    # language's profile declares the construct absent
+    decorators: list[str] = field(default_factory=list)
+    parent: RawDecl | None = field(default=None, repr=False, compare=False)
+    takes_fn: bool = False
+    returns_fn: bool = False
+    #: for each ``table:<name>`` in ``calls``: where ``<name>`` is declared --
+    #: ``("item", decl)``, ``("receiver", None)`` or ``("module", None)``.
+    #: ``build_index`` turns it into the table's address.
+    table_scopes: dict = field(default_factory=dict, repr=False, compare=False)
 
 
 def _register_profiles() -> None:

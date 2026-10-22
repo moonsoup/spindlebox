@@ -63,5 +63,13 @@
       "recurse_scope": "same"
     }
   },
-  "returns_norm_hook": "go_multi_return"
+  "returns_norm_hook": "go_multi_return",
+  "meta": {
+    "decorators": {"absent": "Go has no decorator, annotation or attribute syntax on functions."},
+    "parent": {},
+    "takes_fn": {"fn_types": ["(^|[^\\w])func\\s*\\("]},
+    "returns_fn": {"fn_types": ["(^|[^\\w])func\\s*\\("], "return_nodes": ["return_statement"], "unwrap": ["expression_list", "parenthesized_expression"]},
+    "param_calls": {},
+    "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "index_expression", "object": "operand"}, {"node": "type_conversion_expression", "callee": "type", "subscript": "generic_type", "object": "type", "require_declared": true}]}
+  }
 }

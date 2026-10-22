@@ -94,5 +94,13 @@
       "float10": "f64", "pointer": "any",
       "code": "fn", "code *": "fn"
     }
+  },
+  "meta": {
+    "decorators": {"children": ["attribute_specifier", "attribute_declaration"], "strip": ["^\\[\\[", "\\]\\]$"]},
+    "parent": {"absent": "C has no nested functions (GNU nested functions are a compiler extension the grammar does not parse as definitions)."},
+    "takes_fn": {"fn_types": ["\\(\\*\\)"]},
+    "returns_fn": {"fn_types": []},
+    "param_calls": {"unwrap": ["^\\(\\*\\s*([A-Za-z_]\\w*)\\s*\\)$"]},
+    "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "subscript_expression", "object": "argument"}]}
   }
 }

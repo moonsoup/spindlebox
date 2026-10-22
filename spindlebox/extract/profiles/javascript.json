@@ -52,5 +52,13 @@
     "arrow_function": {"handler": "js_function"},
     "method_definition": {"handler": "js_function"}
   },
-  "is_async": {"child_type": "async"}
+  "is_async": {"child_type": "async"},
+  "meta": {
+    "decorators": {"siblings": ["decorator"], "children": ["decorator"], "strip": ["^@"]},
+    "parent": {},
+    "takes_fn": {"fn_types": []},
+    "returns_fn": {"fn_types": [], "return_nodes": ["return_statement"], "unwrap": ["parenthesized_expression"]},
+    "param_calls": {},
+    "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "subscript_expression", "object": "object"}], "receiver_names": ["this"]}
+  }
 }

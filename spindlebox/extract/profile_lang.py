@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 
 from spindlebox.extract.base import RawDecl, RawParam
-from spindlebox.extract.profile_registry import LanguageProfile
+from spindlebox.extract.profile_registry import CONSTRUCTS, LanguageProfile, meta_spec
 from spindlebox.extract.ts_util import parse, preceding_doc, text, walk, walk_own
 
 HOOKS: dict = {}
@@ -38,10 +38,29 @@ def _field_or_self(node, field_name: str | None):
     return node.child_by_field_name(field_name) or node
 
 
+#: A name a table call can be addressed by: ``T``, ``self.routes``, ``a.b.c``.
+_DOTTED = re.compile(r"^[A-Za-z_$][\w$]*(\.[\w$]+)*$")
+
+
+def _dotted_name(raw: str) -> str | None:
+    """``a->b``, ``a::b`` and ``a.b`` all spell the dotted name ``a.b``."""
+    name = raw.replace("->", ".").replace("::", ".")
+    return name if _DOTTED.match(name) else None
+
+
 class ProfileWalker:
-    def __init__(self, profile: LanguageProfile, rel_path: str, source: str):
+    def __init__(self, profile: LanguageProfile, rel_path: str, source: str,
+                 meta: bool = False):
         self.p = profile
         self.rel_path = rel_path
+        # functions used as values (#39): off by default so the walker's output
+        # stays exactly the legacy extractors' (test_profile_walker); indexing
+        # turns it on
+        self.meta = meta
+        self.meta_specs = {c: meta_spec(profile.language, c)
+                           for c in CONSTRUCTS} if meta else {}
+        self._emitted: dict[int, tuple[RawDecl, object]] = {}
+        self._module_names: set[str] | None = None
         source_hook = profile.raw.get("source_hook")
         if source_hook:
             # A spelling the grammar genuinely cannot parse, blanked before the
@@ -233,12 +252,26 @@ class ProfileWalker:
 
     # ---------------------------------------------------------------- calls
 
-    def _calls(self, node) -> list[str]:
+    def _calls(self, node, params: list[RawParam] | None = None,
+               tables: dict | None = None) -> list[str]:
+        """Raw call names in ``node``'s own body.
+
+        With ``params`` given (indexing with ``meta``), a call through one of them
+        is ``param:<name>`` and a call through a subscript is ``table:<name>``,
+        with where ``<name>`` is declared recorded in ``tables`` (#39). Without
+        it the output is exactly what it always was.
+        """
         spec = self.p.calls
         body = _field_or_self(node, "body")
         boundaries = set(spec.get("boundaries", []))
         calls: list[str] = []
         for n in walk_own(body, boundaries):
+            if params is not None:
+                marker = self._indirect_call(n, node, params, tables)
+                if marker is not None:
+                    if marker not in calls:
+                        calls.append(marker)
+                    continue
             if n.type != spec.get("node"):
                 continue
             if "compose" in spec:
@@ -264,6 +297,159 @@ class ProfileWalker:
                 calls.append(t)
         return calls
 
+    # ------------------------------------------------- functions as values
+
+    def _indirect_call(self, n, owner, params: list[RawParam], tables: dict | None) -> str | None:
+        """``param:<name>`` or ``table:<name>`` when ``n`` calls through one, else None."""
+        table = self.meta_specs.get("table_calls")
+        if table is not None:
+            for rule in table.get("calls", ()):
+                if n.type != rule["node"]:
+                    continue
+                callee = n.child_by_field_name(rule["callee"])
+                if callee is None or callee.type != rule["subscript"]:
+                    continue
+                obj = (callee.child_by_field_name(rule["object"]) if rule.get("object")
+                       else (callee.named_children[0] if callee.named_children else None))
+                name = _dotted_name(text(obj)) if obj is not None else None
+                if name is None:
+                    continue
+                root = name.split(".", 1)[0]
+                scope = self._table_scope(root, owner, params)
+                if rule.get("require_declared") and scope == ("module", None) \
+                        and root not in self._module_declared():
+                    continue           # a generic type conversion, not a table
+                if tables is not None:
+                    tables[f"table:{name}"] = scope
+                return f"table:{name}"
+        pcalls = self.meta_specs.get("param_calls")
+        if pcalls is not None and n.type == self.p.calls.get("node"):
+            member = pcalls.get("member")
+            if member is not None:
+                # a language that invokes a callable through a method on it
+                # (Java's f.apply(x)): the object must be a parameter typed as one
+                obj = n.child_by_field_name(member["object"])
+                if obj is None or obj.type != "identifier":
+                    return None
+                fn_types = [re.compile(t) for t in member.get("fn_types", ())]
+                typed = {p.name for p in params if p.kind != "receiver" and p.raw_type
+                         and any(t.search(p.raw_type) for t in fn_types)}
+                return f"param:{text(obj)}" if text(obj) in typed else None
+            fn = n.child_by_field_name(self.p.calls.get("field", "function"))
+            if fn is None:
+                return None
+            raw = text(fn)
+            for pattern in pcalls.get("unwrap", ()):
+                m = re.match(pattern, raw)
+                if m:
+                    raw = m.group(1)
+            if raw in {p.name for p in params if p.kind != "receiver"}:
+                return f"param:{raw}"
+        return None
+
+    def _module_declared(self) -> set[str]:
+        if self._module_names is None:
+            self._module_names = self._declared(self.root)
+        return self._module_names
+
+    def _emitted_ancestors(self, node):
+        """(decl, node) for every already-emitted item enclosing ``node``, innermost first."""
+        p = node.parent
+        while p is not None:
+            hit = self._emitted.get(p.id)
+            if hit is not None:
+                yield hit
+            p = p.parent
+
+    def _table_scope(self, root: str, owner, params: list[RawParam]) -> tuple:
+        """Where the table a call goes through is declared, innermost scope first."""
+        spec = self.meta_specs.get("table_calls") or {}
+        receivers = {p.name for p in params if p.kind == "receiver"}
+        if root in receivers or root in spec.get("receiver_names", ()):
+            return ("receiver", None)
+        if root in {p.name for p in params} | self._declared(owner):
+            return ("self", None)
+        for decl, anc in self._emitted_ancestors(owner):
+            if root in {p.name for p in decl.params} | self._declared(anc):
+                return ("item", decl)
+        return ("module", None)
+
+    def _decorators(self, node) -> list[str]:
+        spec = self.meta_specs.get("decorators")
+        if spec is None:
+            return []
+        found = []
+        siblings = set(spec.get("siblings", ()))
+        if siblings:
+            before = []
+            p = node.prev_named_sibling
+            while p is not None and (p.type in siblings or "comment" in p.type):
+                if p.type in siblings:
+                    before.append(p)
+                p = p.prev_named_sibling
+            found += reversed(before)
+        children = set(spec.get("children", ()))
+        within = spec.get("within", {})
+        for c in node.named_children:
+            if c.type in children:
+                found.append(c)
+            elif c.type in within:
+                found += [g for g in c.named_children if g.type in within[c.type]]
+        out = []
+        for d in found:
+            t = " ".join(text(d).split())
+            for pattern in spec.get("strip", ()):
+                t = re.sub(pattern, "", t)
+            out.append(t.strip())
+        return out
+
+    def _returns_nested(self, node, spec: dict) -> bool:
+        """Does a return statement in ``node`` hand back a function defined in it?"""
+        return_nodes = set(spec.get("return_nodes", ()))
+        if not return_nodes:
+            return False
+        body = _field_or_self(node, "body")
+        nested: set[str] = set()
+        returned = []
+        for n in walk_own(body, self.boundaries):
+            if n.type in self.p.declarations:
+                nm = n.child_by_field_name("name")
+                if nm is None and n.parent is not None:
+                    nm = n.parent.child_by_field_name("name")
+                if nm is not None:
+                    nested.add(text(nm))
+            elif n.type in return_nodes and n.named_children:
+                returned.append(n.named_children[0])
+        for expr in returned:
+            while expr.type in spec.get("unwrap", ()) and expr.named_children:
+                expr = expr.named_children[0]
+            if expr.type in self.p.declarations:
+                return True
+            if expr.type == "identifier" and text(expr) in nested:
+                return True
+        return False
+
+    def _apply_meta(self, decl: RawDecl, node, returns_fn: bool | None) -> None:
+        if self.meta_specs.get("parent") is not None:
+            decl.parent = next((d for d, _ in self._emitted_ancestors(node)), None)
+        decl.decorators = self._decorators(node)
+        takes = self.meta_specs.get("takes_fn")
+        if takes is not None:
+            fn_types = [re.compile(t) for t in takes.get("fn_types", ())]
+            decl.takes_fn = any(
+                p.raw_type and any(t.search(p.raw_type) for t in fn_types)
+                for p in decl.params
+            ) or any(c.startswith("param:") for c in decl.calls)
+        rets = self.meta_specs.get("returns_fn")
+        if rets is not None:
+            fn_types = [re.compile(t) for t in rets.get("fn_types", ())]
+            decl.returns_fn = bool(returns_fn) or bool(
+                decl.returns_raw and any(t.search(decl.returns_raw) for t in fn_types)
+            ) or self._returns_nested(node, rets)
+        for key, scope in decl.table_scopes.items():
+            if scope[0] == "self":
+                decl.table_scopes[key] = ("item", decl)
+
     # ----------------------------------------------------------------- emit
 
     def _is_async(self, node) -> bool:
@@ -275,13 +461,16 @@ class ProfileWalker:
         return any(c.type == spec["child_type"] for c in node.children)
 
     def emit(self, node, name, kind, scope, classes, params, state,
-             returns_raw=None, returns_norm=None) -> None:
+             returns_raw=None, returns_norm=None, returns_fn=None) -> None:
+        """``returns_fn`` lets a hook say a callable is returned when the return
+        type's spelling cannot (C's ``int (*f(void))(int)``); only read with ``meta``."""
         doc_types = self.p.doc.get("types")
         if self.p.doc.get("hook"):
             raw_doc = HOOKS[self.p.doc["hook"]](self, node)
         else:
             raw_doc = preceding_doc(node, set(doc_types) if doc_types else None)
-        self.decls.append(RawDecl(
+        tables: dict = {}
+        decl = RawDecl(
             name=name,
             kind=kind,
             language=self.p.language,
@@ -296,10 +485,15 @@ class ProfileWalker:
             is_async=self._is_async(node),
             doc=_clean_doc(raw_doc, self.p.doc.get("clean")),
             body_text=text(node),
-            calls=self._calls(node),
+            calls=self._calls(node, params if self.meta else None, tables),
             imports=list(self.imports),
             state_capture=state,
-        ))
+            table_scopes=tables,
+        )
+        if self.meta:
+            self._apply_meta(decl, node, returns_fn)
+            self._emitted[node.id] = (decl, node)
+        self.decls.append(decl)
 
     # ---------------------------------------------------------------- walks
 
@@ -384,8 +578,11 @@ class ProfileWalker:
                     anc_declared | self._declared(node), True)
 
 
-def extract_with_profile(profile: LanguageProfile, rel_path: str, source: str) -> list[RawDecl]:
-    return ProfileWalker(profile, rel_path, source).run()
+def extract_with_profile(profile: LanguageProfile, rel_path: str, source: str,
+                         meta: bool = False) -> list[RawDecl]:
+    """``meta`` adds what #39 records about functions used as values; the default
+    output is unchanged."""
+    return ProfileWalker(profile, rel_path, source, meta).run()
 
 
 # ------------------------------------------------------------- hook library
@@ -923,15 +1120,19 @@ def _c_function(walker: ProfileWalker, node, spec, scope, classes, anc_declared,
         return
     params = walker._params(fdecl)
     stars = 0
+    returns_fn = False
     cur = fdecl.parent
     while cur is not None and cur is not node:
         if cur.type in ("pointer_declarator", "array_declarator"):
             stars += 1
+        elif cur.type == "function_declarator":
+            returns_fn = True       # `int (*name(...))(int)` returns a function pointer
         cur = cur.parent
     base = text(node.child_by_field_name("type"))
     returns_raw = (f"{base} {'*' * stars}".strip() if stars else base) or None
     name = text(ident)
     walker.emit(node, name, "function", scope, classes, params,
-                _c_state(walker, node, params), returns_raw=returns_raw)
+                _c_state(walker, node, params), returns_raw=returns_raw,
+                returns_fn=returns_fn)
     walker._visit(node, [*scope, name], classes,
                   anc_declared | walker._declared(node), True)

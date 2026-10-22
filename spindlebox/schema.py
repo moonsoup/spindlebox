@@ -174,6 +174,21 @@ class Item:
     #: profile's ``entry_points``; None when it is not one. Only meaningful on an
     #: index whose ``markers`` include ``entry_points`` (#38). Omitted when None.
     entry_point: str | None = None
+    #: Functions used as values (#39), each decided at extraction from the
+    #: language profile's ``meta`` block and omitted when empty, so an index
+    #: without them is unchanged on disk. Whether a language has the construct
+    #: at all is recorded per language in ``ScaIndex.constructs``.
+    #: ``decorators``: decorator, annotation or attribute expressions, sigil
+    #: stripped (``staticmethod``, ``app.route('/x')``, ``inline``).
+    decorators: list[str] = field(default_factory=list)
+    #: ``parent``: address of the item this one is nested in (a closure's
+    #: enclosing function); None at the top level or inside a class only.
+    parent: str | None = None
+    #: ``takes_fn``: a parameter is a callable -- typed as one, or called.
+    takes_fn: bool = False
+    #: ``returns_fn``: a callable is returned -- typed as one, or a function
+    #: defined in the body is handed back.
+    returns_fn: bool = False
 
     def to_dict(self) -> dict:
         d = {
@@ -191,6 +206,14 @@ class Item:
             d["source_text"] = self.source_text
         if self.entry_point is not None:
             d["entry_point"] = self.entry_point
+        if self.decorators:
+            d["decorators"] = self.decorators
+        if self.parent is not None:
+            d["parent"] = self.parent
+        if self.takes_fn:
+            d["takes_fn"] = True
+        if self.returns_fn:
+            d["returns_fn"] = True
         return d
 
     @classmethod
@@ -218,6 +241,10 @@ class Item:
             hash=_req(d, "hash", ctx),
             source_text=d.get("source_text"),
             entry_point=d.get("entry_point"),
+            decorators=list(d.get("decorators", [])),
+            parent=d.get("parent"),
+            takes_fn=bool(d.get("takes_fn", False)),
+            returns_fn=bool(d.get("returns_fn", False)),
         )
 
 
@@ -309,6 +336,13 @@ class ScaIndex:
     #: before the markers existed has none, and analysis falls back to its old
     #: heuristics for it (#38). Serialized as ``project.markers``; omitted when empty.
     markers: list[str] = field(default_factory=list)
+    #: For each language in the index, the function-as-value constructs its
+    #: profile declares present (#39): a subset of ``decorators``, ``parent``,
+    #: ``takes_fn``, ``returns_fn``, ``param_calls``, ``table_calls``. An empty
+    #: item field means "none here" only for a construct listed for its
+    #: language; otherwise the language has no such construct. Serialized as
+    #: ``project.constructs``; omitted when empty.
+    constructs: dict[str, list[str]] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         d = {
@@ -332,6 +366,8 @@ class ScaIndex:
             # under `project`, beside the version that wrote them: the top-level
             # key set is read by hand elsewhere and is pinned (test_sidecar)
             d["project"]["markers"] = self.markers
+        if self.constructs:
+            d["project"]["constructs"] = self.constructs
         return d
 
     @classmethod
@@ -360,6 +396,7 @@ class ScaIndex:
             parse_errors=list(d.get("parse_errors", [])),
             files=dict(d.get("files", {})),
             markers=list(project.get("markers", [])),
+            constructs={k: list(v) for k, v in project.get("constructs", {}).items()},
         )
 
     def save(self, path: str | Path) -> None:
