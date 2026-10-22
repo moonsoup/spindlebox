@@ -55,5 +55,6 @@
     "returns_fn": {"fn_types": ["\\b(Fn|FnMut|FnOnce)\\s*\\(", "(^|[^\\w])fn\\s*\\("], "return_nodes": ["return_expression"]},
     "param_calls": {},
     "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "index_expression", "object": null}]}
-  }
+  },
+  "fn_tables": {"declarations": [{"node": "static_item", "name": "name", "value": "value"}, {"node": "const_item", "name": "name", "value": "value"}], "unwrap": {"reference_expression": "value"}, "containers": {"array_expression": {"entries": {"tuple_expression": {"key": 0, "value": -1}}}}, "members": ["identifier"], "keys": {"string_literal": "str", "integer_literal": "int"}}
 }

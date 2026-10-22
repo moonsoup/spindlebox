@@ -23,7 +23,7 @@ Compile-time validation pass over an index.
 |---|---|---|---|
 | `path` | directory | — | validate the index under exactly this root (no upward search) |
 | `--project` | name | index at/above cwd | used when `path` is omitted |
-| `--strict` | flag | off | `any`-typed signatures become errors |
+| `--strict` | flag | off | `any`-typed signatures, and `fn_tables` whose members mix signature classes, become errors |
 
 ### Use cases
 
@@ -34,6 +34,12 @@ Compile-time validation pass over an index.
 
 (The warnings go to stderr and name each untyped item — `--verbose` on `index`
 shows the same list.)
+
+Beside the synthetic `op_arrays`, `validate` checks the *real* function tables
+in the index's `fn_tables` section (#40) — dicts and lists of functions,
+registries and entry-point groups found in the source. A member that is not an
+item is an error; members that do not share one signature class are a warning
+naming the table and each class, and an error under `--strict`.
 
 **Typing gate for CI** — strict mode turns untyped signatures into failures:
 

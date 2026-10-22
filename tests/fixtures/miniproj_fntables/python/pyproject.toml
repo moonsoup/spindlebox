@@ -1,0 +1,9 @@
+[project]
+name = "demo"
+version = "0.1.0"
+
+[project.scripts]
+demo-tool = "pkg.cli:run_tool"
+
+[project.entry-points."demo.plugins"]
+extra = "pkg.cli:activate"

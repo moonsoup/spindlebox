@@ -23,7 +23,9 @@ near-duplicates.
 | `--min-severity` | `high` \| `medium` \| `low` | low | cutoff (high is most severe) |
 | `--json` | flag | off | machine-readable |
 
-The kinds: **dead_item** — no in-index caller, not an entrypoint, no ctx edge
+The kinds: **dead_item** — no in-index caller, not an entrypoint, no ctx edge,
+not a member of a reached function table (a `fn_tables` entry that some item
+calls through as `table:<address>`, or any packaging `entry_points` group — #40)
 (entry points are the language's own conventions, stamped on each item by
 extraction from its profile's `entry_points`: `main` everywhere, `init` and
 `Test*` in Go, `test_*`/`cmd_*`/`setup` in Python only; an index built before
@@ -64,6 +66,11 @@ duplication.
 
 Mine candidate cross-function pipelines from the SPI — chains that are already
 latent in the code's call graph and ctx contracts.
+
+A call through a function table (`table:<address>`, matched to the index's
+`fn_tables` section) is a fan-out edge to each of the table's `n` members at
+`calls` = 1/n — the same split as an ambiguous call, because the index knows the
+callee is one of them but not which (#40).
 
 ### Synopsis
 

@@ -17,6 +17,10 @@ STATE_CAPTURES = {
 }
 FN_TRAITS = {"fn", "Fn", "FnMut", "FnOnce"}
 GROUP_KINDS = {"package", "module", "class"}
+#: How source holds the functions of an ``FnTable`` (#40): a ``dict`` or ``list``
+#: literal, a ``registry`` filled by ``register(fn)`` or a registering decorator,
+#: or packaging ``entry_points``.
+FN_TABLE_KINDS = {"dict", "list", "registry", "entry_points"}
 
 
 class SchemaError(Exception):
@@ -283,6 +287,42 @@ class Group:
 
 
 @dataclass
+class FnTable:
+    """A data structure in the source that holds functions (#40).
+
+    Unlike a group's ``op_arrays`` -- synthetic buckets of one signature class --
+    a table is found in the code: a module-level dict or list of functions, a
+    registry, or the entry points a package declares. ``members`` are item
+    addresses, in source order. ``key_type`` is the core-1 type a member is
+    looked up by (``str`` for a dict keyed by strings, ``int`` for a list),
+    ``any`` when keys mix or cannot be typed, None when members have no key.
+    """
+    address: str
+    file: str
+    span: tuple[int, int]
+    kind: str  # FN_TABLE_KINDS
+    members: list[str]
+    key_type: str | None
+
+    def to_dict(self) -> dict:
+        return {"address": self.address, "file": self.file, "span": list(self.span),
+                "kind": self.kind, "members": self.members, "key_type": self.key_type}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> FnTable:
+        ctx = f"fn_table '{d.get('address', '?')}'"
+        span = _req(d, "span", ctx)
+        return cls(
+            address=_req(d, "address", ctx),
+            file=_req(d, "file", ctx),
+            span=(int(span[0]), int(span[1])),
+            kind=_enum(_req(d, "kind", ctx), FN_TABLE_KINDS, "fn_table kind", ctx),
+            members=list(_req(d, "members", ctx)),
+            key_type=d.get("key_type"),
+        )
+
+
+@dataclass
 class Pipeline:
     name: str
     stages: list[int]
@@ -343,6 +383,11 @@ class ScaIndex:
     #: language; otherwise the language has no such construct. Serialized as
     #: ``project.constructs``; omitted when empty.
     constructs: dict[str, list[str]] = field(default_factory=dict)
+    #: Data structures in the source that hold functions (#40); see ``FnTable``.
+    #: Only meaningful on an index whose ``markers`` include ``fn_tables``.
+    #: Serialized as a top-level section, omitted when empty so an index without
+    #: tables keeps exactly the keys other projects read by hand.
+    fn_tables: list[FnTable] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d = {
@@ -368,6 +413,8 @@ class ScaIndex:
             d["project"]["markers"] = self.markers
         if self.constructs:
             d["project"]["constructs"] = self.constructs
+        if self.fn_tables:
+            d["fn_tables"] = [t.to_dict() for t in self.fn_tables]
         return d
 
     @classmethod
@@ -397,6 +444,7 @@ class ScaIndex:
             files=dict(d.get("files", {})),
             markers=list(project.get("markers", [])),
             constructs={k: list(v) for k, v in project.get("constructs", {}).items()},
+            fn_tables=[FnTable.from_dict(t) for t in d.get("fn_tables", [])],
         )
 
     def save(self, path: str | Path) -> None:

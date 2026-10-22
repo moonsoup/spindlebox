@@ -27,6 +27,10 @@ describes everything spindlebox needs to support an input language:
 - ``meta``            how functions used as values look in the language: one
                       entry per name in ``CONSTRUCTS``, each either a spec or
                       ``{"absent": "<why>"}`` -- never left out (#39)
+- ``fn_tables``       how a module-level dict or list of functions is spelled:
+                      a spec for the walker, ``{"absent": "<why>"}`` when the
+                      language has none, or ``{"unsupported": "<why>"}`` when it
+                      has them but they are not detected yet (#40)
 
 Adding a new input language should normally mean adding one JSON profile and
 pinning one grammar wheel — no new Python module.
@@ -221,3 +225,20 @@ def meta_spec(language: str, construct: str) -> dict | None:
 def declared_constructs(language: str) -> list[str]:
     """The ``CONSTRUCTS`` a language declares present, in ``CONSTRUCTS`` order."""
     return [c for c in CONSTRUCTS if meta_spec(language, c) is not None]
+
+
+def fn_tables_for(language: str) -> dict | None:
+    """How a language spells a data structure of functions (#40), or None.
+
+    Profiled languages declare a ``fn_tables`` spec for the walker; Python's lives
+    beside its native extractor. None when the profile says the language has no
+    such structure (``absent``) or that it is not detected yet (``unsupported``).
+    """
+    prof = all_profiles().get(language)
+    if prof is not None and prof.raw.get("fn_tables") is not None:
+        spec = prof.raw["fn_tables"]
+        return None if ("absent" in spec or "unsupported" in spec) else dict(spec)
+    if language == "python":
+        from spindlebox.extract.py_lang import PY_FN_TABLES
+        return dict(PY_FN_TABLES)
+    return None

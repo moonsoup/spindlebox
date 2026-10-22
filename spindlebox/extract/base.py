@@ -79,6 +79,28 @@ class RawDecl:
     table_scopes: dict = field(default_factory=dict, repr=False, compare=False)
 
 
+@dataclass
+class RawFnTable:
+    """A data structure holding functions, as one extractor found it (#40).
+
+    ``members`` are references as written: a bare or dotted name, or the
+    ``RawDecl`` itself (a decorated function). ``qualified`` marks names that are
+    full dotted paths (packaging entry points) rather than names in scope at
+    ``file``. ``build_index`` resolves them to item addresses; ``address`` is set
+    when the table is not addressed by its file's module (``pyproject.toml``).
+    """
+    name: str
+    file: str
+    start_line: int
+    end_line: int
+    kind: str
+    key_type: str | None
+    members: list = field(default_factory=list)
+    scope_chain: list[str] = field(default_factory=list)
+    qualified: bool = False
+    address: str | None = None
+
+
 def _register_profiles() -> None:
     """Extend the language tables with declaratively-profiled languages."""
     from spindlebox.extract.profile_registry import all_profiles

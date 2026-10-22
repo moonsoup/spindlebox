@@ -71,5 +71,6 @@
     "returns_fn": {"fn_types": ["(^|[^\\w])func\\s*\\("], "return_nodes": ["return_statement"], "unwrap": ["expression_list", "parenthesized_expression"]},
     "param_calls": {},
     "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "index_expression", "object": "operand"}, {"node": "type_conversion_expression", "callee": "type", "subscript": "generic_type", "object": "type", "require_declared": true}]}
-  }
+  },
+  "fn_tables": {"declarations": [{"node": "var_spec", "name": "name", "value": "value"}], "unwrap": {"expression_list": null, "composite_literal": "body", "literal_element": null, "unary_expression": "operand"}, "containers": {"literal_value": {"entries": {"keyed_element": {"key": "key", "value": "value"}}}}, "members": ["identifier"], "keys": {"interpreted_string_literal": "str", "raw_string_literal": "str", "int_literal": "int"}}
 }

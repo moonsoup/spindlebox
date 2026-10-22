@@ -6,8 +6,13 @@ Checks (errors → non-zero exit from the CLI):
 - ctx_schema is type-consistent with every adapter's requires/provides
 - pipelines are type-sound stage to stage (direct chain or ctx chain)
 - ordinal integrity (unique, not retired, group members exist)
+- every fn_table member is an item in the index (#40)
 
-Warnings (errors under --strict): 'any'-bearing signatures.
+Warnings (errors under --strict): 'any'-bearing signatures; a fn_table whose
+members do not share one signature class (#40). A table is found in the source,
+not built by spindlebox like an op_array, so mixing signatures there is a
+finding about the code -- every caller through it must cope with each shape --
+rather than a corrupt index.
 """
 
 from __future__ import annotations
@@ -107,6 +112,21 @@ def validate_index(index: ScaIndex, strict: bool = False) -> tuple[list[str], li
                             f"member {ordinal} ('{item.address}') has sig_class "
                             f"'{item.sig_class}'"
                         )
+
+    by_address = {item.address: item for item in index.items}
+    for table in index.fn_tables:
+        classes: dict[str, list[str]] = {}
+        for member in table.members:
+            item = by_address.get(member)
+            if item is None:
+                errors.append(f"fn_table '{table.address}' references unknown item '{member}'")
+            else:
+                classes.setdefault(item.sig_class, []).append(member)
+        if len(classes) > 1:
+            shapes = "; ".join(f"{sig} ({', '.join(m)})" for sig, m in sorted(classes.items()))
+            msg = (f"fn_table '{table.address}' ({table.kind}) is not homogeneous: "
+                   f"members have {len(classes)} signature classes: {shapes}")
+            (errors if strict else warnings).append(msg)
 
     for item in index.items:
         for key, t in {**item.ctx_adapter.requires, **item.ctx_adapter.provides}.items():

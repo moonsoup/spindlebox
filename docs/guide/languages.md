@@ -70,6 +70,18 @@ case is `go.json`; every key below is quoted from it.
   lives beside its native extractor. The index lists, per language, the
   constructs it declares in `project.constructs`; the item fields are omitted
   when empty.
+  A `"fn_tables"` key says how a top-level dict or list of functions is
+  spelled, so extraction can record it in the index's `fn_tables` section
+  (`address, file, span, kind, members, key_type` — #40): `declarations` (the
+  node and the fields holding its name and value), `unwrap` (wrapper nodes to
+  see through), `containers` (literal nodes, with the entry nodes that make one
+  a dict and where each entry's key and value are), `members` (node types that
+  name a function) and `keys` (key node type → core-1 type). A language without
+  such structures says `{"absent": "<why>"}` (Bash); one whose structures are
+  not detected yet says `{"unsupported": "<why>"}` (Java). Python's native
+  extractor also finds registries — a function that stores its argument into a
+  module-level table, called at module level or used as a decorator — and the
+  entry points `pyproject.toml` declares.
   An `external_imports` rule may name its `"separators"` (`["::"]`, `["/"]`)
   when import paths are not dotted; without it the rule splits on `.` exactly as
   before. `boundaries` are the node types that open a new function

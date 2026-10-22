@@ -117,5 +117,6 @@
     "returns_fn": {"fn_types": ["=>", "\\bFunction\\b"], "return_nodes": ["return_statement"], "unwrap": ["parenthesized_expression"]},
     "param_calls": {},
     "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "subscript_expression", "object": "object"}], "receiver_names": ["this"]}
-  }
+  },
+  "fn_tables": {"declarations": [{"node": "variable_declarator", "name": "name", "value": "value"}], "unwrap": {"parenthesized_expression": null, "as_expression": null, "satisfies_expression": null}, "containers": {"object": {"entries": {"pair": {"key": "key", "value": "value"}}}, "array": {}}, "members": ["identifier"], "keys": {"property_identifier": "str", "string": "str", "number": "int"}}
 }

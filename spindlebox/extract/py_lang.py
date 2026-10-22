@@ -7,7 +7,8 @@ import builtins
 import re
 import symtable
 
-from spindlebox.extract.base import RawDecl, RawParam
+from spindlebox.extract.base import RawDecl, RawFnTable, RawParam
+from spindlebox.typenorm import normalize
 
 _FUNC_NODES = (ast.FunctionDef, ast.AsyncFunctionDef)
 _SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
@@ -73,7 +74,11 @@ def _collect_calls(func: ast.AST, param_names: set[str] | None = None) -> list[s
                 if isinstance(n.func, ast.Name) and name in param_names:
                     name = f"param:{name}"
                 elif isinstance(n.func, ast.Subscript):
-                    table = _dotted(n.func.value)
+                    # T[k](x), and T[k]["fn"](x) through a table of records (#40)
+                    base = n.func.value
+                    while isinstance(base, ast.Subscript):
+                        base = base.value
+                    table = _dotted(base)
                     name = f"table:{table}" if table else None
             if name and name not in calls:
                 calls.append(name)
@@ -333,3 +338,259 @@ def extract_python_file(rel_path: str, source: str, meta: bool = False) -> list[
         decl_of[node] = decl
         decls.append(decl)
     return decls
+
+
+# ------------------------------------------------- functions held in data (#40)
+
+#: Python's ``fn_tables`` spec, in the shape a profile's takes (#40). The native
+#: extractor reads the AST directly, so this records what it detects rather
+#: than how: module- and class-level literals, registries filled by
+#: ``T[k] = fn`` / ``T.append(fn)`` / ``T.add(fn)`` (directly, or inside a
+#: function called with or decorating the function), and the entry points a
+#: ``pyproject.toml`` declares.
+PY_FN_TABLES = {
+    "source": "ast",
+    "literals": ["dict", "list", "tuple", "set"],
+    "registries": ["T[k] = fn", "T.append(fn)", "T.add(fn)"],
+    "entry_points": "pyproject.toml",
+}
+
+#: Methods that put their argument into a table, and the key it is then found by.
+_STORE_METHODS = {"append": "int", "add": None}
+
+
+def _fn_refs(node: ast.AST) -> list[str]:
+    """Names a table entry holds: ``f``, ``mod.f``, or those inside a nested record."""
+    if isinstance(node, ast.Name | ast.Attribute):
+        name = _dotted(node)
+        return [name] if name else []
+    if isinstance(node, ast.Dict):
+        return [r for v in node.values for r in _fn_refs(v)]
+    if isinstance(node, ast.Tuple | ast.List | ast.Set):
+        return [r for e in node.elts for r in _fn_refs(e)]
+    return []
+
+
+def _const_key_type(key: ast.AST | None) -> str:
+    if isinstance(key, ast.Constant) and isinstance(key.value, str):
+        return "str"
+    if isinstance(key, ast.Constant) and type(key.value) is int:
+        return "int"
+    return "any"
+
+
+def _literal_table(value: ast.AST) -> tuple[str, str | None, list[str]] | None:
+    """(kind, key_type, member names) when ``value`` is a dict/list/tuple/set literal."""
+    if isinstance(value, ast.Dict):
+        types = {_const_key_type(k) for k in value.keys}
+        key_type = types.pop() if len(types) == 1 else "any"
+        return "dict", key_type, [r for v in value.values for r in _fn_refs(v)]
+    if isinstance(value, ast.List | ast.Tuple):
+        return "list", "int", [r for e in value.elts for r in _fn_refs(e)]
+    if isinstance(value, ast.Set):
+        return "list", None, [r for e in value.elts for r in _fn_refs(e)]
+    return None
+
+
+def _store(stmt: ast.AST, tables: set[str]) -> tuple[str, ast.AST, str | None, ast.AST | None] | None:
+    """``(table, stored value, key_type, key node)`` when ``stmt`` puts a value
+    into one of ``tables``: ``T[k] = v``, ``T.append(v)`` or ``T.add(v)``."""
+    if isinstance(stmt, ast.Assign):
+        for t in stmt.targets:
+            if isinstance(t, ast.Subscript) and _dotted(t.value) in tables:
+                return _dotted(t.value), stmt.value, _const_key_type(t.slice), t.slice
+    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+        call = stmt.value
+        f = call.func
+        if (isinstance(f, ast.Attribute) and f.attr in _STORE_METHODS
+                and _dotted(f.value) in tables and len(call.args) == 1):
+            return _dotted(f.value), call.args[0], _STORE_METHODS[f.attr], None
+    return None
+
+
+def _positional(func: ast.AST) -> list[ast.arg]:
+    return func.args.posonlyargs + func.args.args
+
+
+def _registrar(func: ast.FunctionDef, module_names: set[str]) -> dict | None:
+    """How ``func`` puts a function into a module-level table, or None.
+
+    ``direct``: a parameter of ``func`` itself is stored (``register(fn)``, or a
+    plain ``@register`` decorator). ``factory``: a parameter of a function nested
+    in it is stored (``@register("name")``). The key annotation, when the key is a
+    parameter, types the table's keys.
+    """
+    annotations = {}
+    for g in [func, *(n for n in ast.walk(func) if isinstance(n, _FUNC_NODES) and n is not func)]:
+        params = {a.arg: a for a in _positional(g) + g.args.kwonlyargs}
+        for a in params.values():
+            if a.annotation is not None:
+                annotations.setdefault(a.arg, ast.unparse(a.annotation))
+        for n in _walk_own(g):
+            found = _store(n, module_names)
+            if found is None:
+                continue
+            table, value, key_type, key = found
+            stored = [r for r in _fn_refs(value) if r in params]
+            if not stored:
+                continue
+            if isinstance(key, ast.Name):
+                raw = annotations.get(key.id)
+                key_type = normalize(raw, "python") if raw else "any"
+            names = [a.arg for a in _positional(g)]
+            return {
+                "name": func.name, "table": table,
+                "mode": "direct" if g is func else "factory",
+                "param": stored[0],
+                "index": names.index(stored[0]) if stored[0] in names else None,
+                "key_type": key_type,
+            }
+    return None
+
+
+def extract_python_fn_tables(rel_path: str, source: str,
+                             decls: list[RawDecl] | None = None) -> dict:
+    """The data structures in one file that hold functions (#40).
+
+    Returns ``{"tables": [RawFnTable], "registrars": [...], "registrations": [...]}``.
+    Tables are module- and class-level literals plus module-level stores into
+    them; their members are names as written. A *registrar* is a module-level
+    function that stores a function into a module-level table; a *registration*
+    is a decorator, or a module-level call, that may hand it one. Registrars and registrations
+    can sit in different files, so ``build_index`` pairs them. ``decls`` are this
+    file's items, so a decorated function can be named by its ``RawDecl``.
+    """
+    tree = ast.parse(source)
+    by_line = {(d.start_line, d.name): d for d in decls or []}
+    tables: dict[str, RawFnTable] = {}
+
+    def scan(body: list[ast.stmt], chain: list[str]) -> None:
+        for stmt in body:
+            if isinstance(stmt, ast.ClassDef):
+                scan(stmt.body, [*chain, stmt.name])
+                continue
+            target = None
+            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
+                target = stmt.targets[0]
+            elif isinstance(stmt, ast.AnnAssign) and stmt.value is not None:
+                target = stmt.target
+            if isinstance(target, ast.Name):
+                lit = _literal_table(stmt.value)
+                if lit is not None:
+                    kind, key_type, refs = lit
+                    key = ".".join([*chain, target.id])
+                    tables[key] = RawFnTable(
+                        name=target.id, file=rel_path, start_line=stmt.lineno,
+                        end_line=stmt.end_lineno or stmt.lineno, kind=kind,
+                        key_type=key_type, members=refs, scope_chain=list(chain))
+                continue
+            if chain:
+                continue
+            found = _store(stmt, {k for k in tables if "." not in k})
+            if found is not None:
+                name, value, key_type, _ = found
+                t = tables[name]
+                refs = _fn_refs(value)
+                if refs and not t.members:
+                    t.kind, t.key_type = "registry", key_type
+                t.members.extend(refs)
+
+    scan(tree.body, [])
+    module_names = {k for k in tables if "." not in k}
+    for stmt in tree.body:
+        if isinstance(stmt, ast.Assign | ast.AnnAssign):
+            targets = stmt.targets if isinstance(stmt, ast.Assign) else [stmt.target]
+            module_names.update(t.id for t in targets if isinstance(t, ast.Name))
+
+    registrars = []
+    for stmt in tree.body:
+        if isinstance(stmt, _FUNC_NODES):
+            r = _registrar(stmt, module_names)
+            if r is not None:
+                assigned = tables.get(r["table"])
+                r.update(file=rel_path, start_line=assigned.start_line if assigned else stmt.lineno,
+                         end_line=assigned.end_line if assigned else stmt.end_lineno)
+                registrars.append(r)
+
+    registrations = []
+    for node in ast.walk(tree):
+        if isinstance(node, _FUNC_NODES):
+            decl = by_line.get((node.lineno, node.name))
+            for d in node.decorator_list:
+                head = _dotted(d.func if isinstance(d, ast.Call) else d)
+                if head and decl is not None:
+                    registrations.append({
+                        "head": head, "mode": "factory" if isinstance(d, ast.Call) else "direct",
+                        "member": decl, "file": rel_path, "line": node.lineno})
+    # register(fn) at module level only: inside a function its argument is
+    # usually a parameter or local, which no name lookup can resolve safely
+    for node in _walk_own(tree):
+        if isinstance(node, ast.Call):
+            head = _dotted(node.func)
+            if head:
+                registrations.append({
+                    "head": head, "mode": "call", "file": rel_path, "line": node.lineno,
+                    "args": [_dotted(a) if isinstance(a, ast.Name | ast.Attribute) else None
+                             for a in node.args],
+                    "kwargs": {k.arg: _dotted(k.value) for k in node.keywords
+                               if k.arg and isinstance(k.value, ast.Name | ast.Attribute)},
+                })
+    return {"tables": list(tables.values()), "registrars": registrars,
+            "registrations": registrations}
+
+
+def _toml_header(line: str) -> list[str] | None:
+    s = line.strip()
+    if not s.startswith("[") or s.startswith("[["):
+        return None
+    inner = s[1:s.index("]")] if "]" in s else s[1:]
+    return [a or b or c for a, b, c in
+            re.findall(r'"([^"]*)"|\'([^\']*)\'|([^.\s"\']+)', inner)]
+
+
+def _toml_span(lines: list[str], path: list[str]) -> tuple[int, int]:
+    for i, line in enumerate(lines):
+        if _toml_header(line) == path:
+            end = i
+            for j in range(i + 1, len(lines)):
+                if _toml_header(lines[j]) is not None:
+                    break
+                if lines[j].strip() and not lines[j].strip().startswith("#"):
+                    end = j
+            return i + 1, end + 1
+    return 1, max(len(lines), 1)
+
+
+def pyproject_fn_tables(text: str, rel_path: str = "pyproject.toml") -> list[RawFnTable]:
+    """The entry points a ``pyproject.toml`` declares, one table per group (#40):
+    ``[project.scripts]``, ``[project.gui-scripts]`` and each
+    ``[project.entry-points.<group>]``. Members are ``module.attr`` paths."""
+    import tomllib
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return []
+    project = data.get("project")
+    if not isinstance(project, dict):
+        return []
+    groups = [(["project", k], project[k]) for k in ("scripts", "gui-scripts")
+              if isinstance(project.get(k), dict)]
+    eps = project.get("entry-points")
+    if isinstance(eps, dict):
+        groups += [(["project", "entry-points", g], v) for g, v in eps.items()
+                   if isinstance(v, dict)]
+    lines = text.splitlines()
+    out = []
+    for path, entries in groups:
+        refs = []
+        for value in entries.values():
+            if not isinstance(value, str):
+                continue
+            module, _, attr = value.split("[", 1)[0].strip().partition(":")
+            refs.append(f"{module.strip()}.{attr.strip()}" if attr.strip() else module.strip())
+        start, end = _toml_span(lines, path)
+        out.append(RawFnTable(
+            name=path[-1], file=rel_path, start_line=start, end_line=end,
+            kind="entry_points", key_type="str", members=refs, qualified=True,
+            address=".".join(["pyproject", *path])))
+    return out

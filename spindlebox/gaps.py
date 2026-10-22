@@ -1,7 +1,9 @@
 """`spindlebox gaps` — find gaps in the software from the SPI alone.
 
 Four gap kinds, all computed from index data already present:
-- dead_item:          no in-index caller, not an entrypoint, no ctx provider/consumer edge
+- dead_item:          no in-index caller, not an entrypoint, no ctx provider/consumer edge,
+                      not a member of a reached ``fn_table`` (a dispatch table, registry
+                      or entry-point group something calls through -- #40)
 - unprovided_ctx_key: a ctx key some item requires that no item provides
 - unresolvable_call:  a bare called name that is neither an item nor an import (likely typo)
                       (a language's builtins arrive already marked ``builtin:`` by
@@ -21,6 +23,7 @@ import re
 
 from spindlebox.depmap import import_root
 from spindlebox.extract.profile_registry import known_call_names
+from spindlebox.fn_tables import live_members
 from spindlebox.schema import Item, ScaIndex
 
 _ENTRYPOINT_NAMES = {"main", "__init__", "__main__", "setup"}
@@ -81,9 +84,10 @@ def _dead_items(idx: ScaIndex) -> list[dict]:
         all_provides |= set(it.ctx_adapter.provides)
         all_requires |= set(it.ctx_adapter.requires)
     is_entry = _entry_point_check(idx)
+    in_reached_table = live_members(idx)
     out = []
     for item in idx.items:
-        if item.address in callers or is_entry(item):
+        if item.address in callers or is_entry(item) or item.address in in_reached_table:
             continue
         provides_edge = bool(set(item.ctx_adapter.provides) & all_requires)
         consumes_edge = bool(set(item.ctx_adapter.requires) & all_provides)

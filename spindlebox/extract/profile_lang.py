@@ -10,8 +10,13 @@ from __future__ import annotations
 
 import re
 
-from spindlebox.extract.base import RawDecl, RawParam
-from spindlebox.extract.profile_registry import CONSTRUCTS, LanguageProfile, meta_spec
+from spindlebox.extract.base import RawDecl, RawFnTable, RawParam
+from spindlebox.extract.profile_registry import (
+    CONSTRUCTS,
+    LanguageProfile,
+    fn_tables_for,
+    meta_spec,
+)
 from spindlebox.extract.ts_util import parse, preceding_doc, text, walk, walk_own
 
 HOOKS: dict = {}
@@ -311,6 +316,10 @@ class ProfileWalker:
                     continue
                 obj = (callee.child_by_field_name(rule["object"]) if rule.get("object")
                        else (callee.named_children[0] if callee.named_children else None))
+                # T[k]["fn"](x): the table is the innermost subscripted object (#40)
+                while obj is not None and obj.type == rule["subscript"]:
+                    obj = (obj.child_by_field_name(rule["object"]) if rule.get("object")
+                           else (obj.named_children[0] if obj.named_children else None))
                 name = _dotted_name(text(obj)) if obj is not None else None
                 if name is None:
                     continue
@@ -583,6 +592,93 @@ def extract_with_profile(profile: LanguageProfile, rel_path: str, source: str,
     """``meta`` adds what #39 records about functions used as values; the default
     output is unchanged."""
     return ProfileWalker(profile, rel_path, source, meta).run()
+
+
+# ------------------------------------------------- functions held in data (#40)
+
+def _pick(node, where):
+    """A child by field name, or by index into the named children (``-1`` = last)."""
+    if where is None:
+        return None
+    if isinstance(where, int):
+        kids = [c for c in node.named_children if "comment" not in c.type]
+        return kids[where] if -len(kids) <= where < len(kids) else None
+    return node.child_by_field_name(where)
+
+
+def extract_fn_tables_with_profile(profile: LanguageProfile, rel_path: str,
+                                   source: str) -> list[RawFnTable]:
+    """Top-level dict and list literals of functions, as the profile's
+    ``fn_tables`` spec spells them (#40). Members are names as written; a table
+    with none that name a function is dropped by ``build_index``.
+
+    The spec: ``declarations`` (node, and the fields holding its name and
+    value), ``name_nodes`` (what a name is, found depth-first in the name field),
+    ``unwrap`` (wrapper node -> field or index of what it wraps; null = first
+    named child), ``containers`` (literal node -> ``entries``: entry node -> where
+    its key and value are; an element that is not an entry makes a list),
+    ``members`` (node types that name a function) and ``keys`` (key node type ->
+    core-1 type).
+    """
+    spec = fn_tables_for(profile.language)
+    if not spec:
+        return []
+    walker = ProfileWalker(profile, rel_path, source)
+    enclosing = set(profile.declarations) | set(profile.boundaries)
+    unwrap = spec.get("unwrap", {})
+    members = set(spec.get("members", ()))
+    keys = spec.get("keys", {})
+    name_nodes = set(spec.get("name_nodes", ("identifier",)))
+
+    def unwrapped(node):
+        while node is not None and node.type in unwrap:
+            where = unwrap[node.type]
+            node = _pick(node, 0 if where is None else where)
+        return node
+
+    out: list[RawFnTable] = []
+    decl_specs = {d["node"]: d for d in spec.get("declarations", ())}
+    for node in walk(walker.root):
+        d = decl_specs.get(node.type)
+        if d is None:
+            continue
+        p = node.parent
+        while p is not None and p.type not in enclosing:
+            p = p.parent
+        if p is not None:
+            continue                       # inside a function: not a table of the module
+        name_node = node.child_by_field_name(d["name"])
+        name_node = next((n for n in walk(name_node) if n.type in name_nodes), None) \
+            if name_node is not None else None
+        value = unwrapped(node.child_by_field_name(d["value"]))
+        if name_node is None or value is None or value.type not in spec["containers"]:
+            continue
+        entries = spec["containers"][value.type].get("entries", {})
+        refs: list[str] = []
+        key_types: set[str] = set()
+        is_dict = False
+        for child in value.named_children:
+            if "comment" in child.type:
+                continue
+            child = unwrapped(child)
+            if child is None:
+                continue
+            if child.type in entries:
+                is_dict = True
+                key = unwrapped(_pick(child, entries[child.type].get("key")))
+                key_types.add(keys.get(key.type, "any") if key is not None else "any")
+                child = unwrapped(_pick(child, entries[child.type].get("value")))
+            if child is not None and child.type in members:
+                refs.append(text(child))
+        if is_dict:
+            kind, key_type = "dict", key_types.pop() if len(key_types) == 1 else "any"
+        else:
+            kind, key_type = "list", "int"
+        out.append(RawFnTable(
+            name=text(name_node), file=rel_path,
+            start_line=node.start_point[0] + 1, end_line=node.end_point[0] + 1,
+            kind=kind, key_type=key_type, members=refs))
+    return out
 
 
 # ------------------------------------------------------------- hook library
