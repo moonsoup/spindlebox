@@ -41,7 +41,7 @@ def validate(report: dict) -> None:
         raise FindingsError("'project' must be a string")
 
     scanned = report.get("scanned", None)
-    if isinstance(scanned, bool) or not isinstance(scanned, (int, type(None))):
+    if isinstance(scanned, bool) or not isinstance(scanned, int | type(None)):
         raise FindingsError(
             "'scanned' is an integer, or null for 'nothing that reads files ran' "
             "-- null and 0 are different answers")

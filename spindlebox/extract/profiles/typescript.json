@@ -13,6 +13,7 @@
     }
   },
   "walker": true,
+  "builtins": ["Array", "ArrayBuffer", "BigInt", "Boolean", "DataView", "Date", "Error", "EvalError", "Float32Array", "Float64Array", "Function", "Int8Array", "Int16Array", "Int32Array", "Intl", "JSON", "Map", "Math", "Number", "Object", "Promise", "Proxy", "RangeError", "ReferenceError", "Reflect", "RegExp", "Set", "String", "Symbol", "SyntaxError", "TypeError", "URIError", "Uint8Array", "Uint8ClampedArray", "Uint16Array", "Uint32Array", "WeakMap", "WeakRef", "WeakSet", "decodeURI", "decodeURIComponent", "encodeURI", "encodeURIComponent", "eval", "globalThis", "isFinite", "isNaN", "parseFloat", "parseInt", "queueMicrotask", "setTimeout", "setInterval", "clearTimeout", "clearInterval", "structuredClone", "fetch", "console", "require"],
   "mode": "nested",
   "boundaries": [
     "function_declaration",

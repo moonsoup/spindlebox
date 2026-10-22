@@ -16,6 +16,7 @@ from spindlebox.extract.base import (
     discover_files,
     normalize_langs,
 )
+from spindlebox.extract.profile_registry import builtins_for
 from spindlebox.schema import CtxAdapter, Deps, Group, Item, Param, ScaIndex, Signature
 from spindlebox.sigclass import build_signature_classes, partition_op_arrays, sig_class_id
 from spindlebox.staleness import snapshot_files
@@ -172,7 +173,8 @@ def build_index(
     for item in items:
         addresses_by_name.setdefault(item.name, []).append(item.address)
     for item in items:
-        item.deps.calls = resolve_calls(raw_calls[item.address], item.group, addresses_by_name)
+        item.deps.calls = resolve_calls(raw_calls[item.address], item.group, addresses_by_name,
+                                        builtins=builtins_for(item.language))
 
     ctx_schema = apply_ctx_normalization(items)
     signature_classes = build_signature_classes(items)

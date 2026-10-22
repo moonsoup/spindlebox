@@ -40,7 +40,11 @@ case is `go.json`; every key below is quoted from it.
 ```
 
 - `extensions` auto-extend the file-discovery map; `grammar` names the wheel and
-  its entry attribute. `boundaries` are the node types that open a new function
+  its entry attribute. An optional `"builtins": [...]` lists the names the
+  language provides without an import (`len`, `append`, `panic` for Go);
+  extraction marks a call to one of them `builtin:<name>` instead of
+  `external:<name>`, which is how `gaps` tells a builtin from a typo without
+  knowing any language. `boundaries` are the node types that open a new function
   scope — the walker never descends past them when analyzing a body.
 
 ```json
@@ -186,6 +190,47 @@ the engine earned the right to define Java by reproducing Rust exactly.
    `miniproj_mixed` and run Y's compiler on the output).
 3. `spindlebox generate --lang y --project <anything indexed>` — the backend is
    registered automatically from the profile file.
+
+## The analysis layer is language-agnostic
+
+Any language spindlebox maps must flow through every analysis function
+without changing that function. Language knowledge belongs to extraction —
+profiles as data, `spindlebox/extract/`, and the `typenorm`/`depmap`
+resolution tables — and extraction resolves it into neutral markers:
+core-1 types, `builtin:`/`external:`/`ambiguous:` call edges, ctx keys.
+The analysis modules (`gaps`, `workflows`, `validate`, `sigclass`, `ctxnorm`,
+`reporting`, `findings_model`) read only those normalized fields.
+
+This is enforced, not aspirational. `tests/test_language_agnostic.py` parses
+every module under `spindlebox/` except `extract/` and `generate/` and reports
+four shapes of language knowledge: a comparison on a `language`/`lang` name or
+attribute, a string literal naming a language (profile name, alias or file
+extension), `import builtins`, and an import of a `*_lang` extractor module.
+Every hit must match an entry in
+[`docs/language-agnostic-exceptions.json`](../language-agnostic-exceptions.json)
+by module and by the hash of the statement enclosing the hit. Editing an
+excepted statement changes its hash and voids the entry; an entry that no
+longer matches anything fails the suite too, so the registry cannot rot. The
+seven analysis modules may not hold an entry at all. Planting
+`if item.language == "go":` in `gaps.py` fails the suite — and the suite
+checks that it does.
+
+Exceptions are approved, not declared. An entry is added or re-hashed only in
+a fix-verify round, and the Codex verdict accepting that round's commit is the
+approval the entry cites (`approval.cycle`, `contract`, `issue`, `round`).
+Print the current hits in registry shape with
+`python3 tests/test_language_agnostic.py`.
+
+**Parity harness.** `tests/fixtures/miniproj_parity/<language>/` holds the
+same tiny program in every language that has an extractor — one directory
+per language, so a new profile fails the suite until it has a program there.
+Each is indexed alone and run through every analysis; the language-neutral
+projections of each result (which items are dead, which calls are
+unresolvable, which items are near-duplicates, which chains `workflows`
+mines and how strongly) must be identical across languages. The two places a
+language legitimately differs are read from its profile, never hard-coded in
+the test: a `known_only` call extractor cannot report an unresolvable call,
+and a `fixed_signature` profile requires its fixed parameters everywhere.
 
 ## Limits
 

@@ -100,3 +100,21 @@ def profile_for(language: str) -> LanguageProfile | None:
 def grammar_for(name: str) -> dict | None:
     prof = all_profiles().get(name)
     return prof.grammar if prof is not None else None
+
+
+def builtins_for(language: str) -> frozenset[str]:
+    """Names a language's runtime provides without any import: ``len``, ``Some``, ``parseInt``.
+
+    Profiled languages declare them as ``"builtins"`` in their JSON; Python's
+    native extractor computes them from the interpreter. Extraction marks a call
+    to one of these ``builtin:<name>`` (see ``depmap.resolve_calls``) so that no
+    analysis module has to carry any language's builtin table (#37). A language
+    that declares none gets an empty set, and its runtime calls stay ``external:``.
+    """
+    prof = all_profiles().get(language)
+    if prof is not None and prof.raw.get("builtins"):
+        return frozenset(prof.raw["builtins"])
+    if language == "python":
+        from spindlebox.extract.py_lang import PY_BUILTINS
+        return PY_BUILTINS
+    return frozenset()

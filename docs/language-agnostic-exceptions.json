@@ -1,0 +1,338 @@
+{
+  "schema": "spindlebox.language-agnostic-exceptions/1",
+  "rule": "Any language spindlebox maps must flow through every analysis function without changing that function. Language knowledge belongs to extraction (profiles as data, spindlebox/extract/, and typenorm/depmap resolution), which resolves it into neutral markers; analysis modules read only normalized fields.",
+  "gate": "tests/test_language_agnostic.py scans every module under spindlebox/ except spindlebox/extract/ and spindlebox/generate/ for: a comparison on a `language`/`lang` name or attribute, a string literal naming a language (profile name, alias or file extension), `import builtins`, and any import of a `*_lang` extractor module. Every hit must match an entry below by module and hash.",
+  "hash": "sha256 of the source of the smallest statement enclosing the hit, first 16 hex digits (ast.get_source_segment). Any edit to that statement changes the hash and voids the entry; the gate then fails until the edit is re-approved or the knowledge moves into extraction.",
+  "approval_protocol": "An entry is added or re-hashed only in a fix-verify round, and the Codex verdict that accepts that round's commit is its approval; the `approval` object cites the cycle, contract, issue and round so the verdict is findable on the issue. A rejecting verdict means the entry must go: move the code into extraction or delete it. The seven analysis modules (gaps, workflows, validate, sigclass, ctxnorm, reporting, findings_model) may never hold an entry.",
+  "exceptions": [
+    {
+      "module": "spindlebox/cli.py",
+      "statement": "items = [i for i in items if i.language == args.lang]",
+      "kinds": [
+        "language-compare"
+      ],
+      "hash": "038e92026151cca9",
+      "reason": "`show --lang` is a user-supplied filter on the item's `language` field; no language is named in code, the value comes from the command line.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/cli.py",
+      "statement": "if args.lang and item.language != args.lang:",
+      "kinds": [
+        "language-compare"
+      ],
+      "hash": "019dd5b15fa5cd26",
+      "reason": "`search --lang` is a user-supplied filter on the item's `language` field; no language is named in code, the value comes from the command line.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "_ENV_PATTERNS: dict[str, list[re.Pattern]] = {",
+      "kinds": [
+        "language-literal"
+      ],
+      "hash": "19ed3c1796902f87",
+      "reason": "Env-var detection regexes for the five natively-extracted languages. depmap is extraction-side resolution (the rule names it); profiled languages supply the same thing as `env_patterns` data, and these tables are the pre-profile remainder.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "_ENV_PATTERNS[\"typescript\"] = _ENV_PATTERNS[\"javascript\"]",
+      "kinds": [
+        "language-literal"
+      ],
+      "hash": "de4ac57c2b61e1d4",
+      "reason": "typescript reuses the javascript env-var regexes; extraction-side table aliasing.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "_ENV_PATTERNS[\"tsx\"] = _ENV_PATTERNS[\"javascript\"]",
+      "kinds": [
+        "language-literal"
+      ],
+      "hash": "32e32f74c7882486",
+      "reason": "tsx reuses the javascript env-var regexes; extraction-side table aliasing.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "if language == \"python\":",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "6951a48f2af0fb60",
+      "reason": "external_packages: Python import roots are classified against the interpreter's stdlib module list, which only the Python runtime can supply. Extraction-side resolution; the whole if/elif chain hashes as one statement.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "elif language in (\"javascript\", \"typescript\", \"tsx\"):",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "4771d23b7cf5c9d3",
+      "reason": "external_packages: JavaScript/TypeScript package-name rules (scoped packages, node: and relative specifiers). Extraction-side resolution.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "elif language == \"go\":",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "33d7e4f681f733c1",
+      "reason": "external_packages: Go module-path rule (a dotted first segment is a module host). Extraction-side resolution.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "elif language == \"rust\":",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "4b6445775a27410b",
+      "reason": "external_packages: Rust crate-root rule with the std/core/alloc builtin roots. Extraction-side resolution.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "elif language == \"bash\":",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "15686f28bfca9d0c",
+      "reason": "external_packages: Bash records every sourced path as external. Extraction-side resolution.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/depmap.py",
+      "statement": "elif language in _PROFILE_IMPORTS:",
+      "kinds": [
+        "language-compare"
+      ],
+      "hash": "1caa151c6e8e54c3",
+      "reason": "external_packages: profiled languages are looked up in the table their JSON profile registered (`external_imports`); a data lookup keyed by language, which is the pattern the rule wants.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/dispatch.py",
+      "statement": "if item.language != \"python\":",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "d3cff3fb480e40f9",
+      "reason": "`call` executes an item in-process and is Python-only by design; the check exists to refuse other languages with a clear error rather than exec a non-Python file.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/dispatch.py",
+      "statement": "module_name = \"spindlebox_target_\" + item.file.replace(\"/\", \"_\").removesuffix(\".py\")",
+      "kinds": [
+        "language-literal"
+      ],
+      "hash": "0a04c8761c29c960",
+      "reason": "`call` derives the synthetic module name from the Python file path it is about to exec_module; Python-only by design.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/translate.py",
+      "statement": "_SYNTAX: dict[str, dict] = {",
+      "kinds": [
+        "language-literal"
+      ],
+      "hash": "fabd79cd2462cf8b",
+      "reason": "Body translation's per-target syntax table (Python source to Rust/Java spellings). translate is Python-only by design and the targets are output languages.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/translate.py",
+      "statement": "if item.language != \"python\" or not item.source_text:",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "228bf5d138585b1e",
+      "reason": "Body translation only reads Python source bodies, by design; the check refuses anything else rather than mistranslate it.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/typenorm.py",
+      "statement": "_LANG_FNS = {",
+      "kinds": [
+        "language-literal"
+      ],
+      "hash": "fce490fe56f8388f",
+      "reason": "typenorm's per-language type normalizers for the natively-extracted languages; profiled languages register `types` tables from JSON instead. The rule names typenorm resolution as extraction-side.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/typenorm.py",
+      "statement": "if language == \"bash\":",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "86888ac6954cffe3",
+      "reason": "typenorm: Bash has no type syntax, every value is a string. Extraction-side resolution (normalize()); the whole function body is one statement chain only at the `if` level, so this hashes alone.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/typenorm.py",
+      "statement": "if language in _FIXED_TYPES:",
+      "kinds": [
+        "language-compare"
+      ],
+      "hash": "97e113b9aed35870",
+      "reason": "typenorm: a `fixed`-mode profile registered its single type here; data lookup keyed by language.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/typenorm.py",
+      "statement": "if language in _TYPE_TABLES:",
+      "kinds": [
+        "language-compare"
+      ],
+      "hash": "a7bfc55fb55b4e28",
+      "reason": "typenorm: a `table`-mode profile registered its type table here; data lookup keyed by language.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    },
+    {
+      "module": "spindlebox/typenorm.py",
+      "statement": "return \"any\" if language in (\"python\", \"javascript\", \"typescript\", \"tsx\") else \"unit\"",
+      "kinds": [
+        "language-compare",
+        "language-literal"
+      ],
+      "hash": "8f6fecda76aa9282",
+      "reason": "typenorm: an unannotated slot is `any` in a dynamic language and `unit` in a typed one; the split is per-language knowledge that belongs to extraction and has no profile key yet.",
+      "approval": {
+        "verifier": "codex",
+        "cycle": "fix-verify",
+        "contract": "spindlebox-fix",
+        "issue": 37,
+        "round": 1
+      }
+    }
+  ]
+}

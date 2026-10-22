@@ -26,7 +26,8 @@ near-duplicates.
 The kinds: **dead_item** — no in-index caller, not an entrypoint (`main`,
 `test_*`, `cmd_*`, …), no ctx edge; **unprovided_ctx_key** — a required ctx key
 nothing provides; **unresolvable_call** — a called name that is neither an item
-nor an import (likely a typo); **near_duplicate** — same signature class + same
+nor an import nor a language builtin (likely a typo; builtins arrive from
+extraction already marked `builtin:`, see [languages](languages.md#the-analysis-layer-is-language-agnostic)); **near_duplicate** — same signature class + same
 ctx shape + shared name stem.
 
 ### Use cases

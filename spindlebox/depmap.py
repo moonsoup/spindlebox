@@ -96,6 +96,7 @@ def resolve_calls(
     raw_calls: list[str],
     caller_group: str,
     addresses_by_name: dict[str, list[str]],
+    builtins: frozenset[str] | set[str] | None = None,
 ) -> list[str]:
     """Map raw called names to intra-index addresses where resolvable.
 
@@ -106,8 +107,16 @@ def resolve_calls(
       and nothing disambiguates the call site. The edge is real but its target
       is uncertain, so callers can still treat every same-named item as
       possibly-called rather than losing the edge outright.
-    - ``external:<raw>`` — the name is not in the index at all: a builtin,
-      a stdlib/third-party call, or a genuine typo.
+    - ``builtin:<raw>`` — the name (or its first dotted segment) is one the
+      language provides without an import, per ``builtins`` when given. The
+      caller supplies that set from the item's language profile, so this
+      marker is the only place a builtin is told apart from a typo: ``gaps``
+      used to apply Python's builtins to every language, which flagged Go's
+      ``append``, Rust's ``Some`` and JavaScript's ``parseInt`` as
+      unresolvable (#37). With ``builtins`` omitted nothing is marked and the
+      output is exactly what it always was.
+    - ``external:<raw>`` — the name is not in the index at all: a stdlib or
+      third-party call, a builtin the caller did not declare, or a typo.
 
     Collapsing the first case into the second was the cause of #17. Because
     ``name`` is the last dotted segment, every class sharing a ``close()``
@@ -124,6 +133,8 @@ def resolve_calls(
             resolved.append(candidates[0])
         elif candidates:
             resolved.append(f"ambiguous:{raw}")
+        elif builtins and raw.split(".", 1)[0] in builtins:
+            resolved.append(f"builtin:{raw}")
         else:
             resolved.append(f"external:{raw}")
     seen: set[str] = set()

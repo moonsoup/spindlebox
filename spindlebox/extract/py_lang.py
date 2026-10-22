@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import ast
+import builtins
 import symtable
 
 from spindlebox.extract.base import RawDecl, RawParam
 
 _FUNC_NODES = (ast.FunctionDef, ast.AsyncFunctionDef)
 _SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
+
+#: Every name Python provides without an import. Extraction marks calls to these
+#: ``builtin:<name>`` so that no analysis module needs to know them (#37).
+PY_BUILTINS = frozenset(dir(builtins))
 
 
 def _dotted(node: ast.expr) -> str | None:
@@ -51,7 +56,7 @@ def _instance_capture(func: ast.AST, self_name: str) -> str:
     reads = False
     for n in _walk_own(func):
         if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == self_name:
-            if isinstance(n.ctx, (ast.Store, ast.Del)):
+            if isinstance(n.ctx, ast.Store | ast.Del):
                 return "mutates_instance"
             reads = True
     return "reads_instance" if reads else "pure"

@@ -4,17 +4,17 @@ Four gap kinds, all computed from index data already present:
 - dead_item:          no in-index caller, not an entrypoint, no ctx provider/consumer edge
 - unprovided_ctx_key: a ctx key some item requires that no item provides
 - unresolvable_call:  a bare called name that is neither an item nor an import (likely typo)
+                      (a language's builtins arrive already marked ``builtin:`` by
+                      extraction, so this module knows no language's builtins -- #37)
 - near_duplicate:     items of one signature class with the same ctx shape and a shared name stem
 """
 
 from __future__ import annotations
 
-import builtins
 import re
 
 from spindlebox.schema import Item, ScaIndex
 
-_BUILTINS = set(dir(builtins))
 _ENTRYPOINT_NAMES = {"main", "__init__", "__main__", "setup"}
 _CAMEL = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+")
 
@@ -53,7 +53,7 @@ def _reverse_call_map(items: list[Item]) -> dict[str, set[str]]:
                 for address in by_name.get(name, []):
                     if address != item.address:
                         callers.setdefault(address, set()).add(item.address)
-            elif not callee.startswith("external:"):
+            elif not callee.startswith(("external:", "builtin:")):
                 callers.setdefault(callee, set()).add(item.address)
     return callers
 
@@ -117,7 +117,7 @@ def _unresolvable_calls(idx: ScaIndex) -> list[dict]:
             raw = call[len("external:"):]
             if "." in raw:  # attribute/method call — not a bare missing symbol
                 continue
-            if raw in _BUILTINS or raw in import_roots:
+            if raw in import_roots:
                 continue
             key = (item.address, raw)
             if key in seen:

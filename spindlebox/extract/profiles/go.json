@@ -3,6 +3,7 @@
   "extensions": [".go"],
   "grammar": {"module": "tree_sitter_go", "attr": "language", "name": "go"},
   "walker": true,
+  "builtins": ["append", "cap", "clear", "close", "complex", "copy", "delete", "imag", "len", "make", "max", "min", "new", "panic", "print", "println", "real", "recover"],
   "mode": "nested",
   "boundaries": ["func_literal", "function_declaration", "method_declaration"],
   "imports": [{"node": "import_spec", "field": "path", "strip": "\""}],

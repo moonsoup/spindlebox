@@ -315,6 +315,10 @@ def collect_profile_coverage(ctx):
     from spindlebox.extract.ts_util import parse
 
     fixture_root = Path(ctx.get("fixture_root", "tests/fixtures"))
+    files_by_lang: dict[str, list[Path]] = {}
+    for p in sorted(fixture_root.rglob("*")):
+        if p.is_file() and ".spi" not in p.parts:
+            files_by_lang.setdefault(EXT_MAP.get(p.suffix.lower(), ""), []).append(p)
     rows = []
     for lang, prof in sorted(all_profiles().items()):
         if not prof.walker:
@@ -326,9 +330,7 @@ def collect_profile_coverage(ctx):
             declared.add(prof.calls["node"])
         declared |= {r["node"] for r in prof.imports}
 
-        files = [p for p in sorted(fixture_root.rglob("*"))
-                 if p.is_file() and EXT_MAP.get(p.suffix.lower()) == lang
-                 and ".spi" not in p.parts]
+        files = files_by_lang.get(lang, [])
         observed: set[str] = set()
         grammar = prof.grammar or {}
         for f in files:

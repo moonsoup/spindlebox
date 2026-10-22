@@ -302,7 +302,7 @@ normalized ctx contract:
       imports: json, os, requests
       external packages: requests
       env vars: -
-      calls: external:open, external:splitlines, util.io.Reader.read
+      calls: builtin:open, external:splitlines, util.io.Reader.read
       ctx requires: {"path": "str"}
       ctx provides: {"read_lines_result": "list<str>"}
 
