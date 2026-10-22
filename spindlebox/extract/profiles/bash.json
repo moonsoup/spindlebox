@@ -3,6 +3,7 @@
   "extensions": [".sh", ".bash"],
   "grammar": {"module": "tree_sitter_bash", "attr": "language", "name": "bash"},
   "walker": true,
+  "entry_points": {"names": ["main"], "file_contains": ["test"]},
   "mode": "flat",
   "declarations": {
     "function_definition": {"kind": "function", "name": {"field": "name"}}

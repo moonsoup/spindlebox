@@ -44,7 +44,20 @@ case is `go.json`; every key below is quoted from it.
   language provides without an import (`len`, `append`, `panic` for Go);
   extraction marks a call to one of them `builtin:<name>` instead of
   `external:<name>`, which is how `gaps` tells a builtin from a typo without
-  knowing any language. `boundaries` are the node types that open a new function
+  knowing any language. `"stdlib_calls": [...]` is the same for names a
+  standard library supplies through a header rather than the language itself
+  (`printf`, `malloc` for C): the call stays `external:<name>`, because the code
+  is outside the project, and the name is listed on the item's
+  `deps.stdlib_calls`. `"entry_points": {"names": [...], "prefixes": [...],
+  "file_contains": [...]}` says which items are entered from outside the index
+  (Go: `main`, `init`, `Test*`, `Benchmark*`, …); extraction stamps the reason on
+  the item as `entry_point` (`name:main`, `prefix:Test`, `file:test`). Python's
+  conventions live beside its native extractor. The index lists the markers it
+  carries in `project.markers`; `gaps` trusts a marker only when it is listed
+  there, and falls back to its old heuristics for an older index.
+  An `external_imports` rule may name its `"separators"` (`["::"]`, `["/"]`)
+  when import paths are not dotted; without it the rule splits on `.` exactly as
+  before. `boundaries` are the node types that open a new function
   scope — the walker never descends past them when analyzing a body.
 
 ```json

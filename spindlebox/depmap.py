@@ -40,10 +40,48 @@ _PROFILE_ENV: dict[str, list[re.Pattern]] = {}
 _PROFILE_IMPORTS: dict[str, dict] = {}
 
 
+#: Every separator an import path is split on to find its root. A profile's
+#: ``external_imports`` rule may add its own via ``separators`` (#38).
+_IMPORT_SEPARATORS: list[str] = [".", "/", "::"]
+
+
 def register_deps(language: str, env_patterns: list[str], imports_rule: dict | None) -> None:
     _PROFILE_ENV[language] = [re.compile(p) for p in env_patterns]
     if imports_rule:
         _PROFILE_IMPORTS[language] = imports_rule
+        for sep in imports_rule.get("separators", ()):
+            if sep not in _IMPORT_SEPARATORS:
+                _IMPORT_SEPARATORS.append(sep)
+
+
+def _split_pattern(separators) -> re.Pattern:
+    # longest first, so "::" is never consumed as two ":"
+    seps = sorted(separators, key=len, reverse=True)
+    return re.compile("|".join(re.escape(s) for s in seps))
+
+
+def import_root(imp: str, separators: list[str] | tuple[str, ...] | None = None) -> str:
+    """The first segment of an import path: ``acme`` of ``acme.x``, ``acme/x``, ``acme::x``.
+
+    ``separators`` defaults to every separator any language spindlebox knows
+    declares, so a caller needs no knowledge of which language wrote ``imp``.
+    """
+    return _split_pattern(separators or _IMPORT_SEPARATORS).split(imp, 1)[0]
+
+
+def _profile_external(imp: str, rule: dict, local_roots: set[str]) -> str | None:
+    """A profile rule that names its ``separators``: the external package ``imp``
+    pulls in, or None. Splits on those separators where the default rule splits
+    on ``.`` only; ``drop_last_segment`` drops the last segment after the last one."""
+    seps = rule["separators"]
+    root = import_root(imp, seps)
+    if root in rule.get("stdlib_roots", ()) or root in local_roots:
+        return None
+    if rule.get("drop_last_segment"):
+        cuts = [m.start() for m in _split_pattern(seps).finditer(imp)]
+        if cuts:
+            return imp[:cuts[-1]]
+    return imp
 
 
 def find_env_vars(body: str, language: str) -> list[str]:
@@ -62,6 +100,12 @@ def external_packages(imports: list[str], language: str, local_roots: set[str]) 
     for imp in imports:
         imp = imp.strip()
         if not imp:
+            continue
+        rule = _PROFILE_IMPORTS.get(language)
+        if rule is not None and rule.get("separators"):
+            pkg = _profile_external(imp, rule, local_roots)
+            if pkg is not None:
+                ext.add(pkg)
             continue
         if language == "python":
             root = imp.split(".")[0]

@@ -16,11 +16,19 @@ from spindlebox.extract.base import (
     discover_files,
     normalize_langs,
 )
-from spindlebox.extract.profile_registry import builtins_for
+from spindlebox.extract.profile_registry import (
+    builtins_for,
+    entry_point_reason,
+    entry_points_for,
+    stdlib_calls_for,
+)
 from spindlebox.schema import CtxAdapter, Deps, Group, Item, Param, ScaIndex, Signature
 from spindlebox.sigclass import build_signature_classes, partition_op_arrays, sig_class_id
 from spindlebox.staleness import snapshot_files
 from spindlebox.typenorm import normalize
+
+#: Every marker ``build_index`` writes. See ``ScaIndex.markers``.
+INDEX_MARKERS = ("builtin_calls", "stdlib_calls", "entry_points")
 
 
 def _extract_file(lang: str, rel: str, source: str) -> list[RawDecl]:
@@ -160,6 +168,7 @@ def build_index(
             # `hash` above is taken over this same text, so staleness detection
             # already vouches for it — no separate integrity path needed.
             source_text=d.body_text if with_source else None,
+            entry_point=entry_point_reason(entry_points_for(d.language), d.name, d.file),
         )
         raw_calls[address] = d.calls
         items.append(item)
@@ -175,6 +184,10 @@ def build_index(
     for item in items:
         item.deps.calls = resolve_calls(raw_calls[item.address], item.group, addresses_by_name,
                                         builtins=builtins_for(item.language))
+        stdlib = stdlib_calls_for(item.language)
+        item.deps.stdlib_calls = sorted({
+            c[len("external:"):] for c in item.deps.calls
+            if c.startswith("external:") and c[len("external:"):] in stdlib})
 
     ctx_schema = apply_ctx_normalization(items)
     signature_classes = build_signature_classes(items)
@@ -192,6 +205,8 @@ def build_index(
         ctx_schema=ctx_schema,
         retired_ordinals=retired,
         files=snapshot_files(root, read_files),
+        # the neutral markers this build wrote; `gaps` trusts only what is listed (#38)
+        markers=list(INDEX_MARKERS),
     )
     if errors:
         index.parse_errors = errors  # serialized: an index must never hide skipped files

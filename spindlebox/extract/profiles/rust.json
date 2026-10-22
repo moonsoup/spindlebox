@@ -4,6 +4,7 @@
   "grammar": {"module": "tree_sitter_rust", "attr": "language", "name": "rust"},
   "walker": true,
   "builtins": ["Some", "Ok", "Err", "drop", "Box", "String", "Vec", "Option", "Result", "Default", "From", "Into", "TryFrom", "TryInto", "ToString", "ToOwned", "Clone", "Iterator", "IntoIterator", "FromIterator", "Extend", "AsRef", "AsMut", "PartialEq", "Eq", "PartialOrd", "Ord", "Fn", "FnMut", "FnOnce", "DoubleEndedIterator", "ExactSizeIterator"],
+  "entry_points": {"names": ["main"], "prefixes": ["test_"], "file_contains": ["test"]},
   "mode": "nested",
   "boundaries": ["function_item", "closure_expression"],
   "imports": [{"node": "use_declaration", "field": "argument"}],

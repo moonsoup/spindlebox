@@ -115,13 +115,22 @@ class Deps:
     external_packages: list[str] = field(default_factory=list)
     env_vars: list[str] = field(default_factory=list)
     ctx_keys_required: list[str] = field(default_factory=list)
+    #: Bare names among ``calls`` that the language's standard library supplies
+    #: (its profile's ``stdlib_calls``). The edge stays ``external:`` -- the code
+    #: is outside the project -- but a reader can tell it from a typo without
+    #: knowing the language (#38). Omitted when empty, so older indexes and
+    #: languages that declare none are unchanged on disk.
+    stdlib_calls: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "calls": self.calls, "imports": self.imports,
             "external_packages": self.external_packages, "env_vars": self.env_vars,
             "ctx_keys_required": self.ctx_keys_required,
         }
+        if self.stdlib_calls:
+            d["stdlib_calls"] = self.stdlib_calls
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> Deps:
@@ -131,6 +140,7 @@ class Deps:
             external_packages=list(d.get("external_packages", [])),
             env_vars=list(d.get("env_vars", [])),
             ctx_keys_required=list(d.get("ctx_keys_required", [])),
+            stdlib_calls=list(d.get("stdlib_calls", [])),
         )
 
 
@@ -159,6 +169,11 @@ class Item:
     #: nothing else reads it. `hash` already covers this text, so staleness
     #: detection vouches for it with no extra machinery.
     source_text: str | None = None
+    #: Why this item is entered from outside the index (``name:main``,
+    #: ``prefix:Test``, ``file:test``), decided at extraction from the language
+    #: profile's ``entry_points``; None when it is not one. Only meaningful on an
+    #: index whose ``markers`` include ``entry_points`` (#38). Omitted when None.
+    entry_point: str | None = None
 
     def to_dict(self) -> dict:
         d = {
@@ -174,6 +189,8 @@ class Item:
         # unchanged on disk
         if self.source_text is not None:
             d["source_text"] = self.source_text
+        if self.entry_point is not None:
+            d["entry_point"] = self.entry_point
         return d
 
     @classmethod
@@ -200,6 +217,7 @@ class Item:
             doc=d.get("doc"),
             hash=_req(d, "hash", ctx),
             source_text=d.get("source_text"),
+            entry_point=d.get("entry_point"),
         )
 
 
@@ -284,9 +302,16 @@ class ScaIndex:
     # can tell whether a span is still trustworthy. Empty on indexes built
     # before staleness tracking existed — treated as unverifiable, not clean.
     files: dict[str, dict] = field(default_factory=dict)
+    #: Which language-neutral markers extraction wrote into this index:
+    #: ``builtin_calls`` (``builtin:`` call edges), ``stdlib_calls``
+    #: (``deps.stdlib_calls``) and ``entry_points`` (``item.entry_point``).
+    #: Analysis trusts a marker only when it is listed here; an index built
+    #: before the markers existed has none, and analysis falls back to its old
+    #: heuristics for it (#38). Serialized as ``project.markers``; omitted when empty.
+    markers: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "spi_version": self.spi_version,
             "project": {
                 "name": self.project_name, "root": self.root,
@@ -303,6 +328,11 @@ class ScaIndex:
             "parse_errors": self.parse_errors,
             "files": self.files,
         }
+        if self.markers:
+            # under `project`, beside the version that wrote them: the top-level
+            # key set is read by hand elsewhere and is pinned (test_sidecar)
+            d["project"]["markers"] = self.markers
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> ScaIndex:
@@ -329,6 +359,7 @@ class ScaIndex:
             retired_ordinals=list(d.get("retired_ordinals", [])),
             parse_errors=list(d.get("parse_errors", [])),
             files=dict(d.get("files", {})),
+            markers=list(project.get("markers", [])),
         )
 
     def save(self, path: str | Path) -> None:

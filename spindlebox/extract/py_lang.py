@@ -15,6 +15,15 @@ _SCOPE_NODES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)
 #: ``builtin:<name>`` so that no analysis module needs to know them (#37).
 PY_BUILTINS = frozenset(dir(builtins))
 
+#: Python's entry-point conventions, in the shape a profile's ``entry_points``
+#: takes. These are exactly the names, prefixes and file rule ``gaps`` applied to
+#: every language before #38; they now apply to Python alone.
+PY_ENTRY_POINTS = {
+    "names": ["main", "__init__", "__main__", "setup"],
+    "prefixes": ["cmd_", "test_", "handle_"],
+    "file_contains": ["test"],
+}
+
 
 def _dotted(node: ast.expr) -> str | None:
     if isinstance(node, ast.Name):

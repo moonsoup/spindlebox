@@ -5,7 +5,13 @@ Four gap kinds, all computed from index data already present:
 - unprovided_ctx_key: a ctx key some item requires that no item provides
 - unresolvable_call:  a bare called name that is neither an item nor an import (likely typo)
                       (a language's builtins arrive already marked ``builtin:`` by
-                      extraction, so this module knows no language's builtins -- #37)
+                      extraction, so this module knows no language's builtins -- #37;
+                      its standard-library names arrive on ``deps.stdlib_calls`` -- #38)
+
+Entry points arrive the same way: extraction stamps ``item.entry_point`` from the
+language profile. Which markers an index carries is listed in ``idx.markers``;
+for an index built before a marker existed, this module falls back to the
+heuristic it used before (#38).
 - near_duplicate:     items of one signature class with the same ctx shape and a shared name stem
 """
 
@@ -13,6 +19,8 @@ from __future__ import annotations
 
 import re
 
+from spindlebox.depmap import import_root
+from spindlebox.extract.profile_registry import known_call_names
 from spindlebox.schema import Item, ScaIndex
 
 _ENTRYPOINT_NAMES = {"main", "__init__", "__main__", "setup"}
@@ -20,12 +28,19 @@ _CAMEL = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+")
 
 
 def _is_entrypoint(item: Item) -> bool:
+    """The pre-#38 heuristic, kept for indexes whose ``markers`` lack ``entry_points``."""
     name = item.name
     if name in _ENTRYPOINT_NAMES or name.startswith(("cmd_", "test_", "handle_")):
         return True
     if "test" in item.file.lower() or item.kind == "script_main":
         return True
     return False
+
+
+def _entry_point_check(idx: ScaIndex):
+    if "entry_points" in idx.markers:
+        return lambda item: item.entry_point is not None
+    return _is_entrypoint
 
 
 def _name_tokens(name: str) -> set[str]:
@@ -65,9 +80,10 @@ def _dead_items(idx: ScaIndex) -> list[dict]:
     for it in idx.items:
         all_provides |= set(it.ctx_adapter.provides)
         all_requires |= set(it.ctx_adapter.requires)
+    is_entry = _entry_point_check(idx)
     out = []
     for item in idx.items:
-        if item.address in callers or _is_entrypoint(item):
+        if item.address in callers or is_entry(item):
             continue
         provides_edge = bool(set(item.ctx_adapter.provides) & all_requires)
         consumes_edge = bool(set(item.ctx_adapter.requires) & all_provides)
@@ -106,8 +122,11 @@ def _unresolvable_calls(idx: ScaIndex) -> list[dict]:
     import_roots: set[str] = set()
     for item in idx.items:
         for imp in item.deps.imports:
-            import_roots.add(imp.split(".")[0].split("/")[0])
+            import_roots.add(import_root(imp))
         import_roots |= set(item.deps.external_packages)
+    # an index built before extraction marked runtime names: re-derive them from
+    # the item's profile rather than report every builtin as a typo (#38)
+    legacy = not {"builtin_calls", "stdlib_calls"} <= set(idx.markers)
     out = []
     seen: set[tuple[str, str]] = set()
     for item in idx.items:
@@ -117,7 +136,9 @@ def _unresolvable_calls(idx: ScaIndex) -> list[dict]:
             raw = call[len("external:"):]
             if "." in raw:  # attribute/method call — not a bare missing symbol
                 continue
-            if raw in import_roots:
+            if raw in import_roots or raw in item.deps.stdlib_calls:
+                continue
+            if legacy and raw in known_call_names(item.language):
                 continue
             key = (item.address, raw)
             if key in seen:

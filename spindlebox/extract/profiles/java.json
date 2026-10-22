@@ -3,6 +3,8 @@
   "extensions": [".java"],
   "grammar": {"module": "tree_sitter_java", "attr": "language", "name": "java"},
   "walker": true,
+  "builtins": [],
+  "entry_points": {"names": ["main"], "prefixes": ["test"], "file_contains": ["test"]},
   "mode": "nested",
   "boundaries": ["method_declaration", "constructor_declaration", "lambda_expression"],
   "containers": {

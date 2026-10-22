@@ -4,6 +4,7 @@
   "grammar": {"module": "tree_sitter_go", "attr": "language", "name": "go"},
   "walker": true,
   "builtins": ["append", "cap", "clear", "close", "complex", "copy", "delete", "imag", "len", "make", "max", "min", "new", "panic", "print", "println", "real", "recover"],
+  "entry_points": {"names": ["main", "init"], "prefixes": ["Test", "Benchmark", "Example", "Fuzz"], "file_contains": ["test"]},
   "mode": "nested",
   "boundaries": ["func_literal", "function_declaration", "method_declaration"],
   "imports": [{"node": "import_spec", "field": "path", "strip": "\""}],
