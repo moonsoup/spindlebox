@@ -1,6 +1,6 @@
 """`spindlebox gaps` — find gaps in the software from the SPI alone.
 
-Four gap kinds, all computed from index data already present:
+Five gap kinds, all computed from index data already present:
 - dead_item:          no in-index caller, not an entrypoint, no ctx provider/consumer edge,
                       not a member of a reached ``fn_table`` (a dispatch table, registry
                       or entry-point group something calls through -- #40)
@@ -15,12 +15,16 @@ language profile. Which markers an index carries is listed in ``idx.markers``;
 for an index built before a marker existed, this module falls back to the
 heuristic it used before (#38).
 - near_duplicate:     items of one signature class with the same ctx shape and a shared name stem
+- unreachable_island: items no entry point reaches that are not all dead_items -- a group
+                      that calls itself (mutual or direct recursion, or a dead item's private
+                      helpers) and so reads as live to the one-hop dead_item check (#41)
 """
 
 from __future__ import annotations
 
 import re
 
+from spindlebox import callgraph
 from spindlebox.depmap import import_root
 from spindlebox.extract.profile_registry import known_call_names
 from spindlebox.fn_tables import live_members
@@ -97,6 +101,54 @@ def _dead_items(idx: ScaIndex) -> list[dict]:
             "kind": "dead_item", "address": item.address, "ordinal": item.ordinal,
             "severity": "medium",
             "detail": f"{item.name}: no in-index caller and no context edge",
+        })
+    return out
+
+
+def _unreachable_islands(idx: ScaIndex, dead: set[str]) -> list[dict]:
+    """Groups of items reachable from no root, where some member has a caller.
+
+    The roots are what ``dead_item`` already treats as live without a caller:
+    entry points, members of a reached table, and items with a ctx edge. Every
+    edge kind of ``callgraph`` is followed from them. The unreachable rest is
+    split into weakly connected groups; a group made only of dead_items is
+    already reported, so only a group with a member that *has* a caller -- and
+    so reads as live -- is an island.
+    """
+    graph = callgraph.build_graph(idx)
+    is_entry = _entry_point_check(idx)
+    in_reached_table = live_members(idx)
+    has_ctx_edge = {a for a, outs in graph.items() if "ctx" in outs.values()}
+    has_ctx_edge |= {b for outs in graph.values() for b, kind in outs.items() if kind == "ctx"}
+    roots = {it.address for it in idx.items
+             if is_entry(it) or it.address in in_reached_table} | has_ctx_edge
+    lost = set(graph) - callgraph.reachable(graph, roots)
+    neighbours: dict[str, set[str]] = {a: set() for a in lost}
+    for a in lost:
+        for b in graph[a]:
+            if b in lost:
+                neighbours[a].add(b)
+                neighbours[b].add(a)
+    ordinal = {it.address: it.ordinal for it in idx.items}
+    out = []
+    seen: set[str] = set()
+    for start in sorted(lost):
+        if start in seen:
+            continue
+        group, todo = {start}, [start]
+        while todo:
+            for b in neighbours[todo.pop()] - group:
+                group.add(b)
+                todo.append(b)
+        seen |= group
+        if group <= dead:
+            continue
+        members = sorted(group)
+        out.append({
+            "kind": "unreachable_island", "members": members,
+            "ordinals": sorted(ordinal[a] for a in members), "severity": "medium",
+            "detail": f"{len(members)} item(s) only reached from each other or from "
+                      f"dead code, never from an entry point",
         })
     return out
 
@@ -193,8 +245,10 @@ def _near_duplicates(idx: ScaIndex) -> list[dict]:
 
 
 def find_gaps(idx: ScaIndex) -> list[dict]:
-    gaps = (_dead_items(idx) + _unprovided_ctx_keys(idx)
-            + _unresolvable_calls(idx) + _near_duplicates(idx))
+    dead = _dead_items(idx)
+    gaps = (dead + _unprovided_ctx_keys(idx)
+            + _unresolvable_calls(idx) + _near_duplicates(idx)
+            + _unreachable_islands(idx, {g["address"] for g in dead}))
     order = {"high": 0, "medium": 1, "low": 2}
     gaps.sort(key=lambda g: (order.get(g["severity"], 3), g["kind"], g.get("address", "")))
     return gaps

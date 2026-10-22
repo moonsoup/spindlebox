@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import spindlebox
-from spindlebox import registry, staleness, workflows
+from spindlebox import callgraph, registry, staleness, workflows
 from spindlebox.addresses import parse_selector
 from spindlebox.dispatch import DispatchError, call_item, resolve_item
 from spindlebox.extract import build_index
@@ -500,7 +500,12 @@ def cmd_gaps(args) -> int:
 def cmd_workflows(args) -> int:
     from spindlebox.workflows import mine_workflows
     idx, _root = _load_project(args)
-    flows = mine_workflows(idx, min_confidence=args.min_confidence)
+    stats: dict = {}
+    flows = mine_workflows(idx, min_confidence=args.min_confidence, stats=stats)
+    if stats["flows_capped"]:
+        # never cap silently (#41)
+        print(f"note: stopped walking at {workflows.MAX_FLOWS} candidates; "
+              f"later sources were not explored", file=sys.stderr)
     if args.json:
         print(json.dumps(flows, indent=1))
         return 0
@@ -509,8 +514,51 @@ def cmd_workflows(args) -> int:
         return 0
     for f in flows[: args.limit]:
         chain = " → ".join(f["addresses"])
+        tail = ""
+        if f["cycle"]:
+            tail += f"  ↺ {f['cycle'][0]}"
+        if f["truncated"]:
+            tail += f"  (truncated at {workflows.MAX_PATH})"
         print(f"[conf {f['confidence']:.2f} str {f['strength']:.2f}] "
-              f"({f['stages']} stages) {chain}")
+              f"({f['stages']} stages) {chain}{tail}")
+    if len(flows) > args.limit:
+        print(f"... {len(flows) - args.limit} more (raise --limit)")
+    return 0
+
+
+def cmd_emergent(args) -> int:
+    from spindlebox.callgraph import emergent
+    idx, _root = _load_project(args)
+    if args.depth < 1:
+        print("--depth must be at least 1", file=sys.stderr)
+        return 2
+    report = emergent(idx, depth=args.depth)
+    if args.from_address:
+        report["roots"] = [r for r in report["roots"] if r["address"] == args.from_address]
+        if not report["roots"]:
+            print(f"no item at {args.from_address}", file=sys.stderr)
+            return 1
+    if args.json:
+        print(json.dumps(report, indent=1))
+        return 0
+    print(f"{report['items']} items, {report['edges']} edges, "
+          f"{len(report['cycles'])} cycle(s); chains to depth {report['depth']}")
+    for c in report["cycles"]:
+        print(f"cycle: {', '.join(c['members'])}")
+    leaves = 0
+    for r in report["roots"]:
+        if not args.from_address and r.get("finite") == 1:
+            leaves += 1
+            continue
+        verdict = (f"finite: {r['finite']}" if "finite" in r
+                   else f"unbounded: {r['unbounded']}  cycle: {', '.join(r['cycle'])}")
+        print(f"{r['address']}  {verdict}")
+        if args.from_address:
+            for c in r["chains"]:
+                more = " → …" if c["continues"] else ""
+                print(f"  {' → '.join(c['addresses'])}{more}  ({', '.join(c['via'])})")
+    if leaves:
+        print(f"{leaves} item(s) with no outgoing edge: finite: 1 (shown with --json or --from)")
     return 0
 
 
@@ -678,7 +726,8 @@ def build_parser() -> argparse.ArgumentParser:
                        "keys, unresolvable calls, near-duplicates)")
     _add_project_arg(p)
     p.add_argument("--kind", choices=["dead_item", "unprovided_ctx_key",
-                                      "unresolvable_call", "near_duplicate"])
+                                      "unresolvable_call", "near_duplicate",
+                                      "unreachable_island"])
     p.add_argument("--min-severity", choices=["high", "medium", "low"], dest="min_severity")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_gaps)
@@ -690,6 +739,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=50)
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_workflows)
+
+    p = sub.add_parser("emergent", help="composed chains past one hop: depth, cycles, "
+                       "and a finite/unbounded verdict per item")
+    _add_project_arg(p)
+    p.add_argument("--depth", type=int, default=callgraph.DEFAULT_DEPTH, help="stages to enumerate chains to")
+    p.add_argument("--from", dest="from_address", metavar="ADDRESS",
+                   help="one item, with its chains listed")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_emergent)
 
     p = sub.add_parser("install-skill", help="install the spindlebox skill to ~/.claude/skills")
     p.set_defaults(func=cmd_install_skill)

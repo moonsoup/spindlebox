@@ -3,7 +3,11 @@
 A directed edge A->B is proposed when A calls B, or when A provides a ctx key
 B requires. A call through a function table counts as a call to each of its
 ``n`` members at strength 1/n (#40). Each edge gets a confidence weight; candidate workflows are the
-maximal simple paths whose every edge clears a threshold. Output is
+maximal simple paths whose every edge clears a threshold. A path that stops at
+``MAX_PATH`` with somewhere left to go says so (``truncated``), and one that
+stops because its next step returns to a stage already on it -- direct
+recursion included -- names that cycle (``cycle``), rather than ending
+silently (#41). Output is
 `pipeline define`-compatible (ordered addresses + ordinals), so an accepted
 candidate feeds straight into the existing pipeline machinery.
 """
@@ -77,6 +81,15 @@ def _edge_confidence(a: Item, b: Item, name_counts: dict[str, int] | None = None
     return round(W_CALL * calls + W_CTX * ctx_cov + W_GROUP * _group_affinity(a, b), 4)
 
 
+def _self_confidence(a: Item, name_counts: dict[str, int],
+                     fan_out: dict[tuple[str, str], tuple[float, str]] | None) -> float:
+    """The weight a self-edge would have; ``_edge_confidence`` drops it from paths."""
+    calls = _call_strength(a, a, name_counts, fan_out)
+    if calls == 0.0:
+        return 0.0
+    return round(W_CALL * calls + W_GROUP, 4)
+
+
 def _build_edges(items: list[Item], min_confidence: float,
                  fn_tables: list[FnTable] | None = None) -> dict[str, list[tuple[str, float]]]:
     name_counts: dict[str, int] = {}
@@ -99,27 +112,56 @@ def _build_edges(items: list[Item], min_confidence: float,
 DEFAULT_MIN_CONFIDENCE = 0.5
 
 
-def mine_workflows(idx: ScaIndex, min_confidence: float = DEFAULT_MIN_CONFIDENCE) -> list[dict]:
+def _self_loops(items: list[Item], min_confidence: float,
+                fn_tables: list[FnTable] | None = None) -> set[str]:
+    """Addresses whose call to themselves would clear the threshold."""
+    name_counts: dict[str, int] = {}
+    for item in items:
+        name_counts[item.name] = name_counts.get(item.name, 0) + 1
+    fan_out = fan_out_strengths(items, fn_tables) if fn_tables else None
+    return {a.address for a in items
+            if (conf := _self_confidence(a, name_counts, fan_out)) > 0 and conf >= min_confidence}
+
+
+def mine_workflows(idx: ScaIndex, min_confidence: float = DEFAULT_MIN_CONFIDENCE,
+                   stats: dict | None = None) -> list[dict]:
+    """Ranked candidate workflows.
+
+    Pass a dict as ``stats`` to learn what was capped: ``found`` (paths walked),
+    ``flows_capped`` (the ``MAX_FLOWS`` walk limit was hit, so later sources went
+    unexplored) and ``truncated`` (paths cut at ``MAX_PATH``). The default
+    ``None`` leaves the return value exactly as before.
+    """
     items = idx.items
     by_addr = {i.address: i for i in items}
     edges = _build_edges(items, min_confidence, idx.fn_tables)
+    self_loops = _self_loops(items, min_confidence, idx.fn_tables)
     has_incoming = {b for outs in edges.values() for b, _ in outs}
     sources = [a for a in edges if a not in has_incoming] or list(edges)
 
     flows: list[dict] = []
+    capped = [False]
 
     def walk(path: list[str], confs: list[float], visiting: set[str]) -> None:
         if len(flows) >= MAX_FLOWS:
+            capped[0] = True
             return
         last = path[-1]
         extended = False
+        outs = sorted(edges.get(last, []), key=lambda e: -e[1])
         if len(path) < MAX_PATH:
-            for nxt, conf in sorted(edges.get(last, []), key=lambda e: -e[1]):
+            for nxt, conf in outs:
                 if nxt in visiting:
                     continue
                 extended = True
                 walk(path + [nxt], confs + [conf], visiting | {nxt})
         if not extended and len(path) >= 2:
+            # why the path ended: the cap, a step back onto itself, or a sink
+            truncated = any(nxt not in visiting for nxt, _ in outs)
+            back = [path.index(nxt) for nxt, _ in outs if nxt in visiting]
+            if last in self_loops:
+                back.append(len(path) - 1)
+            cycle = path[min(back):] if back else None
             flows.append({
                 "addresses": list(path),
                 "ordinals": [by_addr[a].ordinal for a in path],
@@ -130,6 +172,8 @@ def mine_workflows(idx: ScaIndex, min_confidence: float = DEFAULT_MIN_CONFIDENCE
                 "confidence": round(min(confs), 4),
                 "strength": round(sum(confs) / len(confs), 4),
                 "stages": len(path),
+                "truncated": truncated,
+                "cycle": cycle,
             })
 
     for src in sorted(sources):
@@ -145,4 +189,7 @@ def mine_workflows(idx: ScaIndex, min_confidence: float = DEFAULT_MIN_CONFIDENCE
     # at the admission threshold.
     ranked = sorted(unique.values(),
                     key=lambda f: (-f["strength"], -f["confidence"], -f["stages"]))
+    if stats is not None:
+        stats.update(found=len(flows), flows_capped=capped[0],
+                     truncated=sum(f["truncated"] for f in ranked))
     return ranked[:MAX_FLOWS]

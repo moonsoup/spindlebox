@@ -46,7 +46,7 @@ GROUP = "spindlebox.plugins"
 #: against the real parser by a test, so the two cannot drift apart.
 BUILTIN_COMMANDS = frozenset({
     "index", "show", "search", "deps", "stale", "validate", "call", "generate",
-    "report", "pipeline", "projects", "gaps", "workflows", "install-skill",
+    "report", "pipeline", "projects", "gaps", "workflows", "emergent", "install-skill",
     "plugins",
 })
 

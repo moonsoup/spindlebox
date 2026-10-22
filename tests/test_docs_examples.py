@@ -96,7 +96,7 @@ _CMD_DOCS = {
     "querying.md": ["index", "show", "search", "deps", "stale"],
     "model.md": ["validate", "call", "pipeline"],
     "generating.md": ["generate"],
-    "analysis.md": ["gaps", "workflows"],
+    "analysis.md": ["gaps", "workflows", "emergent"],
     "housekeeping.md": ["projects", "plugins"],
 }
 _FLAG = re.compile(r"`(--[a-z-]+)`")

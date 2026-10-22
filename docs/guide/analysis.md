@@ -8,7 +8,7 @@ contains the call graph, ctx edges and signature classes these commands read.
 ## spindlebox gaps
 
 Find gaps in the software: dead items, unprovided ctx keys, unresolvable calls,
-near-duplicates.
+near-duplicates, unreachable islands.
 
 ### Synopsis
 
@@ -19,7 +19,7 @@ near-duplicates.
 | Option | Argument | Default | Effect |
 |---|---|---|---|
 | `--project` | name | index at/above cwd | registered project |
-| `--kind` | `dead_item` \| `unprovided_ctx_key` \| `unresolvable_call` \| `near_duplicate` | all | one gap kind |
+| `--kind` | `dead_item` \| `unprovided_ctx_key` \| `unresolvable_call` \| `near_duplicate` \| `unreachable_island` | all | one gap kind |
 | `--min-severity` | `high` \| `medium` \| `low` | low | cutoff (high is most severe) |
 | `--json` | flag | off | machine-readable |
 
@@ -35,7 +35,14 @@ nothing provides; **unresolvable_call** — a called name that is neither an ite
 nor an import nor a language builtin or standard-library name (likely a typo;
 builtins arrive from extraction already marked `builtin:`, and names like C's
 `printf` arrive listed on `deps.stdlib_calls`, see [languages](languages.md#the-analysis-layer-is-language-agnostic)); **near_duplicate** — same signature class + same
-ctx shape + shared name stem.
+ctx shape + shared name stem; **unreachable_island** — a group of items that no
+entry point reaches, though at least one of them has a caller: functions that call
+each other (or themselves), or a dead item's private helpers. `dead_item` asks
+"does this have any caller?", so such a group reads as live there; this kind asks
+"is it reachable?", following every edge kind of
+[`emergent`](#spindlebox-emergent) from the entry points, the members of reached
+function tables and the items with a ctx edge (#41). One record per group, with
+`members` and `ordinals`.
 
 ### Use cases
 
@@ -71,6 +78,14 @@ A call through a function table (`table:<address>`, matched to the index's
 `fn_tables` section) is a fan-out edge to each of the table's `n` members at
 `calls` = 1/n — the same split as an ambiguous call, because the index knows the
 callee is one of them but not which (#40).
+
+Every candidate also says why it ended: **`truncated`** is `true` when the path
+stopped at the 8-stage cap with somewhere left to go, and **`cycle`** lists the
+stages of the loop it closed when its next step returns to a stage already on
+the path (a function calling itself included), `null` otherwise. The text output
+marks them `↺ <address>` and `(truncated at 8)`, a note on stderr says when the
+200-candidate walk limit was hit, and a final `... N more` line says how many
+candidates `--limit` held back (#41).
 
 ### Synopsis
 
@@ -112,3 +127,60 @@ Always `0`.
 ### See also
 
 [`pipeline`](model.md#spindlebox-pipeline) — where mined candidates graduate to.
+
+## spindlebox emergent
+
+Behaviour that exists only through composition: every composed chain from each
+item to a fixed depth, the cycles in the call graph, and whether the work an
+item starts is bounded (#41).
+
+A chain runs through four edge kinds: **call** (a resolved call), **indirect**
+(an `ambiguous:` call, credited to each same-named item), **table** (a call
+through a `fn_tables` entry, to each member) and **ctx** (an item providing a
+ctx key another requires). Chains are walks, so a cycle repeats an address
+instead of ending the chain. When a chain goes past `--depth`, the item is
+settled by a fixed point over the call graph's strongly connected components:
+**`unbounded: n`** with the members of the cycle it enters, or **`finite: k`**,
+the most stages on any path, measured over the graph with each component
+collapsed to one node. Nothing is capped: `--json` lists every item, and every
+chain stopped by `--depth` says so (`continues`).
+
+### Synopsis
+
+    spindlebox emergent [--project P] [--depth D] [--from ADDRESS] [--json]
+
+### Options
+
+| Option | Argument | Default | Effect |
+|---|---|---|---|
+| `--project` | name | index at/above cwd | registered project |
+| `--depth` | int | 4 | stages to enumerate chains to |
+| `--from` | address | all items | one item, with its chains listed |
+| `--json` | flag | off | machine-readable: `cycles`, and per item `chains` and the verdict |
+
+### Use cases
+
+**Which work is bounded** — one line per item that calls anything; items that
+call nothing are counted, not listed:
+
+    $ spindlebox emergent --project miniproj_gaps
+    10 items, 5 edges, 0 cycle(s); chains to depth 4
+    pipeline.load  finite: 3
+    ...
+    7 item(s) with no outgoing edge: finite: 1 (shown with --json or --from)
+
+**The chains behind one verdict:**
+
+    $ spindlebox emergent --project miniproj_gaps --from pipeline.load
+    ...
+    pipeline.load  finite: 3
+      pipeline.load → pipeline.clean → pipeline.summarize  (ctx, ctx)
+
+### Exit codes
+
+`0`; `1` when `--from` names no item; `2` when `--depth` is below 1.
+
+### See also
+
+[`gaps`](#spindlebox-gaps) — its `unreachable_island` kind reads this graph ·
+[`workflows`](#spindlebox-workflows) — ranked candidates rather than every chain.
