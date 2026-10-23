@@ -45,6 +45,17 @@ disables discovery. Installing a plugin changes exactly one thing about the
 built-in commands -- `report --list` gains `<plugin>:<report>` rows -- and that
 boundary is pinned by tests; do not restate it more broadly than that (#34).
 
+## Non-agentic core (owner, 2026-10-23)
+
+SPIndlebox is a **non-agentic app base**. The core package takes no dependency on an
+LLM, agent runtime, prompt, or agent CLI (`claude`, `codex`, ...): no import, no
+subprocess call, no required config. Agentic capability, including an agentic
+<> script port (reading skills/contracts/agent steps as a mapped "language" and
+converting them to and from script code wherever mappings exist), arrives **only as a
+plugin** through the one-way plugin contract above, and is added from the front end.
+If a feature seems to need an agent inside the core, it belongs in a plugin, or in
+slamface/rockin-robin, which call spindlebox rather than the other way round.
+
 ## Gotchas
 
 - **Ordinals start at 100** on an established index and are sticky/never reused. `show 0-20`
