@@ -27,6 +27,7 @@ from spindlebox.generate.base import (
     flatten_block,
     squeeze_blanks,
 )
+from spindlebox.generate.datatypes import TypeRefs, emit_types, plan
 from spindlebox.generate.rust_backend import _split_top
 from spindlebox.schema import Group, Item, ScaIndex
 from spindlebox.translate import translate_body
@@ -66,6 +67,9 @@ class EmitProfile:
         self.types = data["types"]
         self.t = data["templates"]
         self.files = data["files"]
+        # how the index's `types` are declared in this language (#45); absent means
+        # the profile declares none and `obj:<Name>` renders as the fallback
+        self.datatypes = data.get("datatypes", {})
 
     # mirror of rust_backend._ident, parameterized
     def ident(self, name: str) -> str:
@@ -110,8 +114,12 @@ class EmitProfile:
         return segs
 
     # mirror of rust_backend.rust_type, table-driven
-    def render_type(self, t: str) -> str:
+    def render_type(self, t: str, refs: TypeRefs | None = None) -> str:
         t = t.strip().lstrip(self.types.get("strip_leading", ""))
+        if refs is not None:
+            resolved = refs.resolve(t, lambda a: self.render_type(a, refs))
+            if resolved is not None:
+                return resolved
         simple = self.types["simple"]
         if t in simple:
             return simple[t]
@@ -123,13 +131,13 @@ class EmitProfile:
                 if spec.get("variadic"):
                     if not args:
                         return spec["empty"]
-                    joined = spec.get("join", ", ").join(self.render_type(a) for a in args)
+                    joined = spec.get("join", ", ").join(self.render_type(a, refs) for a in args)
                     return spec["format"].replace("{args}", joined)
                 fmt = spec["format"]
                 need = max((int(m) for m in _PLACEHOLDER.findall(fmt)), default=-1) + 1
                 defaults = spec.get("defaults", [])
                 vals = [
-                    self.render_type(args[i] if i < len(args) else defaults[i])
+                    self.render_type(args[i] if i < len(args) else defaults[i], refs)
                     for i in range(need)
                 ]
                 return fmt.format(*vals)
@@ -172,6 +180,17 @@ class ProfileBackend(GeneratorBackend):
         if p.reserve_aliases:
             extra_reserved.update(aliases.values())
 
+        type_names, type_arity = plan(
+            index.types, p.datatypes, p.ident,
+            p.reserved_types | extra_reserved | set(aliases.values())) \
+            if p.datatypes else ({}, {})
+        type_refs = TypeRefs(type_names, type_arity, p.datatypes) if type_names else None
+        # a group module/class may not share a name with a declared type
+        extra_reserved |= set(type_names.values())
+
+        def render(t: str) -> str:
+            return p.render_type(t, type_refs)
+
         lines = _sub_all(T["header"], **gvars)
 
         # injective ctx-key → field-ident map (same construction as rust_backend);
@@ -189,7 +208,7 @@ class ProfileBackend(GeneratorBackend):
             ctx_fields[key] = ident
         for key in sorted(index.ctx_schema):
             lines.append(_sub(T["ctx_field"], field=ctx_fields[key],
-                              type=p.render_type(index.ctx_schema[key]), **gvars))
+                              type=render(index.ctx_schema[key]), **gvars))
         lines.append(_sub(T["ctx_trace_field"], **gvars))
         lines += _sub_all(T["after_ctx"], **gvars)
 
@@ -197,15 +216,17 @@ class ProfileBackend(GeneratorBackend):
             sc = index.signature_classes[sig_id]
             filtered = [q for q in sc["params"] if q]
             params = ", ".join(
-                _sub(T["alias_param"], type=p.render_type(q), i=str(i))
+                _sub(T["alias_param"], type=render(q), i=str(i))
                 for i, q in enumerate(filtered)
             )
             ret = sc["returns"]
             ret_s = T["alias_ret_unit"] if ret == "unit" else \
-                _sub(T["alias_ret"], type=p.render_type(ret))
+                _sub(T["alias_ret"], type=render(ret))
             lines += _sub_all(T["sig_alias"], sig_id=sig_id, alias=aliases[sig_id],
                               params=params, ret=ret_s, **gvars)
         lines += T.get("after_aliases", [])
+        lines += emit_types(index.types, p.datatypes, p.ident, p.render_type,
+                            type_names, type_arity)
 
         generated_ops: list[tuple[str, str]] = []
         module_sep = T["module_sep"]
@@ -252,14 +273,14 @@ class ProfileBackend(GeneratorBackend):
                 seen_p.add(ident)
                 pidents.append(ident)
             params = []
-            if item.kind == "method":
+            if item.kind == "method" and not item.static:
                 params.append(T["receiver_param"])
             for q, pid in zip(sig_params, pidents, strict=True):
-                params.append(_sub(T["param"], ident=pid, type=p.render_type(q.norm_type)))
+                params.append(_sub(T["param"], ident=pid, type=render(q.norm_type)))
             ret = item.signature.returns_norm
             is_unit = ret == "unit"
             ret_s = T["skeleton_ret_unit"] if is_unit else \
-                _sub(T["skeleton_ret"], type=p.render_type(ret))
+                _sub(T["skeleton_ret"], type=render(ret))
             skeleton = [_sub(T["skeleton_open"], params=", ".join(params), ret=ret_s, **ivars)]
             # Body translation (#21) when the source body is provably within the
             # supported subset AND was captured (`index --with-source`); otherwise the
@@ -295,7 +316,7 @@ class ProfileBackend(GeneratorBackend):
                     tpl = T["fetch_required"] if key in item.ctx_adapter.requires \
                         else T["fetch_optional"]
                     out += _sub_all(tpl, var=var, field=field, key=key,
-                                    type=p.render_type(q.norm_type), **wvars)
+                                    type=render(q.norm_type), **wvars)
                     call_args.append(var)
                 args_s = ", ".join(call_args)
                 result_var = "result"
@@ -311,7 +332,7 @@ class ProfileBackend(GeneratorBackend):
                     rk_key = item.ctx_adapter.return_key
                     if rk_key:
                         rk = ctx_fields.get(rk_key, p.ident(rk_key))
-                        rktype = p.render_type(index.ctx_schema.get(rk_key, "any"))
+                        rktype = render(index.ctx_schema.get(rk_key, "any"))
                         out.append(_sub(T["store"], rk=rk, rktype=rktype,
                                         result=result_var, **wvars))
                     else:
@@ -394,7 +415,7 @@ class ProfileBackend(GeneratorBackend):
                             T["pipeline_edge_op"],
                             src=ctx_fields.get(e["from_key"], p.ident(e["from_key"])),
                             dst=ctx_fields.get(e["to_key"], p.ident(e["to_key"])),
-                            dsttype=p.render_type(index.ctx_schema.get(e["to_key"], "any")),
+                            dsttype=render(index.ctx_schema.get(e["to_key"], "any")),
                             **gvars))
                 pipe_fn = "pipeline_" + p.ident(pipe.name)
                 set_names.append(pipe_fn)

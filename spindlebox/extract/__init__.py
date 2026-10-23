@@ -243,6 +243,7 @@ def build_index(
             decorators=list(d.decorators),
             takes_fn=d.takes_fn,
             returns_fn=d.returns_fn,
+            static=d.static,
         )
         raw_calls[address] = d.calls
         items.append(item)

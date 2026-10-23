@@ -61,7 +61,8 @@
       "kind": "auto",
       "name": {"field": "name"},
       "returns": {"field": "type"},
-      "capture": "instance_this"
+      "capture": "instance_this",
+      "static_modifier": "static"
     },
     "constructor_declaration": {
       "kind": "method",

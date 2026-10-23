@@ -267,5 +267,44 @@
       "kind": "main",
       "path": "src/lib.rs"
     }
-  ]
+  ],
+  "datatypes": {
+    "header": [
+      "// ---- data structures (index `types`, one per line) ----"
+    ],
+    "indent": "",
+    "ref": "crate::${name}",
+    "decl_ref": "${name}",
+    "reserved": [
+      "Ctx",
+      "CtxOp",
+      "OpError",
+      "Self"
+    ],
+    "type_params": "<${params}>",
+    "sum_style": "inline",
+    "record": "${indent}#[derive(Debug, Clone, Default)] pub struct ${name}${tparams} { ${fields} }",
+    "field": "pub ${field}: ${type},",
+    "field_sep": " ",
+    "tuple_record": "${indent}#[derive(Debug, Clone, Default)] pub struct ${name}${tparams}(${fields});",
+    "tuple_field": "pub ${type}",
+    "tuple_field_sep": ", ",
+    "implements": "",
+    "implements_sep": "",
+    "sum": "${indent}#[derive(Debug, Clone)] pub enum ${name}${tparams} { ${variants} }",
+    "variant_unit": "${name},",
+    "variant_struct": "${name} { ${fields} },",
+    "variant_tuple": "${name}(${fields}),",
+    "variant_field": "${field}: ${type},",
+    "variant_field_sep": " ",
+    "tuple_variant_field": "${type}",
+    "tuple_variant_field_sep": ", ",
+    "variant_sep": " ",
+    "sum_default": " impl${bounded} Default for ${name}${tparams} { fn default() -> Self { Self::${first} } }",
+    "bounded_param": "${param}: Default",
+    "default_struct": "${name} { ${fields} }",
+    "default_field": "${field}: Default::default()",
+    "default_tuple": "${name}(${fields})",
+    "default_value": "Default::default()"
+  }
 }

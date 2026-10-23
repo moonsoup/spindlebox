@@ -196,6 +196,11 @@ class Item:
     #: ``returns_fn``: a callable is returned -- typed as one, or a function
     #: defined in the body is handed back.
     returns_fn: bool = False
+    #: ``static``: a method with no receiver (Java ``static``, #45), decided at
+    #: extraction from the declaration's ``static_modifier`` in the language
+    #: profile. Omitted when False, so an index without it is unchanged on disk
+    #: and generation keeps the receiver exactly as before.
+    static: bool = False
 
     def to_dict(self) -> dict:
         d = {
@@ -221,6 +226,8 @@ class Item:
             d["takes_fn"] = True
         if self.returns_fn:
             d["returns_fn"] = True
+        if self.static:
+            d["static"] = True
         return d
 
     @classmethod
@@ -252,6 +259,7 @@ class Item:
             parent=d.get("parent"),
             takes_fn=bool(d.get("takes_fn", False)),
             returns_fn=bool(d.get("returns_fn", False)),
+            static=bool(d.get("static", False)),
         )
 
 

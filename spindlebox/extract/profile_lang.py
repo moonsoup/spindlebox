@@ -577,6 +577,9 @@ class ProfileWalker:
         if self.p.returns_norm_hook:
             returns_norm = HOOKS[self.p.returns_norm_hook](self, node)
         self.emit(node, name, kind, scope, classes, params, state, returns_raw, returns_norm)
+        static_mod = spec.get("static_modifier")
+        if kind == "method" and static_mod and _has_modifier(node, static_mod):
+            self.decls[-1].static = True
         mode = spec.get("recurse_scope", "name" if isinstance(name_spec, dict) else "anon")
         if mode == "same":
             new_scope = scope
@@ -586,6 +589,15 @@ class ProfileWalker:
             new_scope = [*scope, name]
         self._visit(node, new_scope, classes,
                     anc_declared | self._declared(node), True)
+
+
+def _has_modifier(node, modifier: str) -> bool:
+    """The declaration carries ``modifier`` (e.g. Java ``static``) among its
+    ``modifiers`` children -- the receiverless-method signal (#45)."""
+    for child in node.children:
+        if child.type == "modifiers":
+            return any(text(m) == modifier for m in child.children)
+    return False
 
 
 def extract_with_profile(profile: LanguageProfile, rel_path: str, source: str,

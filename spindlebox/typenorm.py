@@ -246,6 +246,18 @@ _RUST_INT = {
     "u8", "u16", "u32", "u64", "u128", "usize",
 }
 _RUST_WRAPPERS = {"Box", "Rc", "Arc", "Cell", "RefCell", "Mutex", "RwLock", "Pin"}
+#: Path roots of the standard library. ``std::collections::HashMap<K, V>`` is the
+#: same type as ``HashMap<K, V>``; without stripping the path it normalized to an
+#: opaque ``obj:std::collections::HashMap`` (#45: generated Rust spells it so).
+_RUST_STD_ROOTS = ("std::", "core::", "alloc::", "::std::", "::core::", "::alloc::")
+
+
+def _rust_std_short(s: str) -> str:
+    """``std::collections::HashMap<..>`` -> ``HashMap<..>``; anything else unchanged."""
+    if not s.startswith(_RUST_STD_ROOTS):
+        return s
+    head, sep, tail = s.partition("<")
+    return head.rsplit("::", 1)[-1] + sep + tail
 
 
 def _rust(s: str | None) -> str:
@@ -272,6 +284,7 @@ def _rust(s: str | None) -> str:
             return f"obj:{base}"
     if s.startswith(("Fn(", "FnMut(", "FnOnce(", "fn(")):
         return "fn"
+    s = _rust_std_short(s)
     g = _generic(s, "<", ">")
     if g:
         base, args = g

@@ -147,6 +147,9 @@ The fuller case is `java.json`, which adds:
   (`class_declaration`, `interface_declaration`, `enum_declaration`,
   `record_declaration`, `annotation_type_declaration`), each with `"role": "class"`;
 - `instance` — how instance-state capture is detected (`"member_prefix": "this."`);
+- `"static_modifier": "static"` on `method_declaration` — a method carrying that
+  modifier is recorded `"static": true` (still kind `method`), so a generated
+  skeleton takes no receiver (#45);
 - `types` — a table registered into the core-1 normalizer instead of a
   per-language function: `"simple": {"String": "str", "int": "i64", ...}` plus
   container bases (`"list_bases": ["List", "ArrayList", ...]`,
@@ -215,6 +218,15 @@ Emit profiles live in `spindlebox/generate/emit_profiles/<lang>.json`. Keyed to
   op arrays, pipelines.
 - **`files`** — what gets written: Java emits one `${root}.java`; Rust emits
   `Cargo.toml` + `src/lib.rs`.
+- **`datatypes`** — how the index's `types` are declared (#45): the use-site
+  reference (`"ref": "crate::${name}"` in Rust, bare `${name}` in Java), one
+  template per record, field and variant, and `"sum_style"` — `inline` (a Rust
+  enum whose variants carry fields) or `sealed` (a Java enum for bare tags,
+  otherwise a sealed interface permitting one record per variant). With it, an
+  `obj:<Name>` the index declares renders as that type instead of the fallback;
+  without it the profile behaves as before. The legacy Rust backend reads this
+  block from `rust.json`, so the two Rust emitters cannot drift. Generated
+  declarations are checked by re-indexing them back to the same shape.
 
 Trust anchor: the Rust emit profile is held **byte-identical** to the original
 hand-written Rust backend by a differential test over every fixture project —

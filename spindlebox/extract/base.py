@@ -73,6 +73,9 @@ class RawDecl:
     parent: RawDecl | None = field(default=None, repr=False, compare=False)
     takes_fn: bool = False
     returns_fn: bool = False
+    #: a method declared without a receiver (Java ``static``), so a generated
+    #: skeleton takes none (#45); set only where a profile names the modifier
+    static: bool = False
     #: for each ``table:<name>`` in ``calls``: where ``<name>`` is declared --
     #: ``("item", decl)``, ``("receiver", None)`` or ``("module", None)``.
     #: ``build_index`` turns it into the table's address.

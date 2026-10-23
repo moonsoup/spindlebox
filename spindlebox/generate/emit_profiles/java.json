@@ -266,5 +266,26 @@
       "kind": "main",
       "path": "${root}.java"
     }
-  ]
+  ],
+  "datatypes": {
+    "header": [
+      "    // ---- data structures (index `types`, one per line) ----"
+    ],
+    "indent": "    ",
+    "ref": "${name}",
+    "decl_ref": "${name}",
+    "reserved": [],
+    "type_params": "<${params}>",
+    "sum_style": "sealed",
+    "record": "${indent}public record ${name}${tparams}(${fields})${implements} {}",
+    "field": "${type} ${field}",
+    "field_sep": ", ",
+    "implements": " implements ${ifaces}",
+    "implements_sep": ", ",
+    "enum": "${indent}public enum ${name} { ${variants} }",
+    "enum_constant": "${name}",
+    "enum_sep": ", ",
+    "sum": "${indent}public sealed interface ${name}${tparams} permits ${members} {}",
+    "sum_empty": "${indent}public interface ${name}${tparams} {}"
+  }
 }
