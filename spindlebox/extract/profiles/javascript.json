@@ -61,5 +61,6 @@
     "param_calls": {},
     "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "subscript_expression", "object": "object"}], "receiver_names": ["this"]}
   },
-  "fn_tables": {"declarations": [{"node": "variable_declarator", "name": "name", "value": "value"}], "unwrap": {"parenthesized_expression": null, "as_expression": null, "satisfies_expression": null}, "containers": {"object": {"entries": {"pair": {"key": "key", "value": "value"}}}, "array": {}}, "members": ["identifier"], "keys": {"property_identifier": "str", "string": "str", "number": "int"}}
+  "fn_tables": {"declarations": [{"node": "variable_declarator", "name": "name", "value": "value"}], "unwrap": {"parenthesized_expression": null, "as_expression": null, "satisfies_expression": null}, "containers": {"object": {"entries": {"pair": {"key": "key", "value": "value"}}}, "array": {}}, "members": ["identifier"], "keys": {"property_identifier": "str", "string": "str", "number": "int"}},
+  "datatypes": {"absent": "JavaScript has no type declarations: an object's shape is never written down, so there is no record, enum or sum to read."}
 }

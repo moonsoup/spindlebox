@@ -72,5 +72,6 @@
     "param_calls": {},
     "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "index_expression", "object": "operand"}, {"node": "type_conversion_expression", "callee": "type", "subscript": "generic_type", "object": "type", "require_declared": true}]}
   },
-  "fn_tables": {"declarations": [{"node": "var_spec", "name": "name", "value": "value"}], "unwrap": {"expression_list": null, "composite_literal": "body", "literal_element": null, "unary_expression": "operand"}, "containers": {"literal_value": {"entries": {"keyed_element": {"key": "key", "value": "value"}}}}, "members": ["identifier"], "keys": {"interpreted_string_literal": "str", "raw_string_literal": "str", "int_literal": "int"}}
+  "fn_tables": {"declarations": [{"node": "var_spec", "name": "name", "value": "value"}], "unwrap": {"expression_list": null, "composite_literal": "body", "literal_element": null, "unary_expression": "operand"}, "containers": {"literal_value": {"entries": {"keyed_element": {"key": "key", "value": "value"}}}}, "members": ["identifier"], "keys": {"interpreted_string_literal": "str", "raw_string_literal": "str", "int_literal": "int"}},
+  "datatypes": {"records": [{"node": "type_spec", "name": "name", "type_params": "type_parameters", "require": {"type": "struct_type"}, "fields": ["type", 0]}], "fields": {"field_declaration_list": {"node": ["field_declaration"], "name": "name", "type": "type", "embedded": true}}, "type_params": {"type_parameter_declaration": "name"}, "hooks": ["go_const_enums", "go_sealed_interfaces"]}
 }

@@ -24,5 +24,6 @@
     "param_calls": {"absent": "Calls are recorded only to functions the file defines (calls.known_only), so a call through a positional parameter (\"$1\" x) cannot be told apart from a command."},
     "table_calls": {"absent": "Bash arrays hold strings; ${T[k]} x runs a command by name, which calls.known_only does not record."}
   },
-  "fn_tables": {"absent": "Bash has no function values: an array holds strings, and running ${T[k]} calls a command by name."}
+  "fn_tables": {"absent": "Bash has no function values: an array holds strings, and running ${T[k]} calls a command by name."},
+  "datatypes": {"absent": "Bash has no data types: every value is a string, and arrays hold strings."}
 }

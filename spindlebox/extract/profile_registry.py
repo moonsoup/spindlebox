@@ -27,6 +27,11 @@ describes everything spindlebox needs to support an input language:
 - ``meta``            how functions used as values look in the language: one
                       entry per name in ``CONSTRUCTS``, each either a spec or
                       ``{"absent": "<why>"}`` -- never left out (#39)
+- ``datatypes``       how records, enums and sums of types are declared: a
+                      spec for the walker, ``{"absent": "<why>"}`` when the
+                      language has no type declarations, or
+                      ``{"unsupported": "<why>"}`` when it has them but they
+                      are not read yet (#44)
 - ``fn_tables``       how a module-level dict or list of functions is spelled:
                       a spec for the walker, ``{"absent": "<why>"}`` when the
                       language has none, or ``{"unsupported": "<why>"}`` when it
@@ -241,4 +246,21 @@ def fn_tables_for(language: str) -> dict | None:
     if language == "python":
         from spindlebox.extract.py_lang import PY_FN_TABLES
         return dict(PY_FN_TABLES)
+    return None
+
+
+def datatypes_for(language: str) -> dict | None:
+    """How a language declares data structures (#44), or None.
+
+    Profiled languages declare a ``datatypes`` spec for the walker; Python's lives
+    beside its native extractor. None when the profile says the language has no
+    type declarations (``absent``) or that they are not read yet (``unsupported``).
+    """
+    prof = all_profiles().get(language)
+    if prof is not None and prof.raw.get("datatypes") is not None:
+        spec = prof.raw["datatypes"]
+        return None if ("absent" in spec or "unsupported" in spec) else dict(spec)
+    if language == "python":
+        from spindlebox.extract.py_lang import PY_DATATYPES
+        return dict(PY_DATATYPES)
     return None

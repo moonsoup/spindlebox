@@ -82,6 +82,22 @@ case is `go.json`; every key below is quoted from it.
   extractor also finds registries — a function that stores its argument into a
   module-level table, called at module level or used as a decorator — and the
   entry points `pyproject.toml` declares.
+  A `"datatypes"` key says how the language declares data structures, so
+  extraction can record them in the index's top-level `types` section (#44):
+  each entry is `name, address, kind, language, file, span, type_params` plus
+  `fields` (`record`) or `variants` (`variant`), in declaration order, with
+  core-1 field types. Inside a declaration a type parameter is `typevar:T`, a
+  generic user type keeps its arguments (`obj:Tree<typevar:T>`) and a Go
+  pointer field is `option<T>`; function signatures are unchanged. The spec
+  lists `records`, `enums` and `unions` (sums spelled as a list of types:
+  Java's `permits`, a TypeScript union of tagged object types); `fields` says,
+  per field-list node, where each field's name and type are; `hooks` covers
+  idioms no node pattern captures (Go's `iota` enums and marker-method
+  interfaces). An alternative that names another type takes that record's
+  fields; one that matches none is listed in `unresolved`. JavaScript and Bash
+  say `{"absent": "<why>"}`; C says `{"unsupported": "<why>"}`. Python's
+  spellings (dataclass, `NamedTuple`, `Enum`, `Card | Cash`) live beside its
+  native extractor.
   An `external_imports` rule may name its `"separators"` (`["::"]`, `["/"]`)
   when import paths are not dotted; without it the rule splits on `.` exactly as
   before. `boundaries` are the node types that open a new function

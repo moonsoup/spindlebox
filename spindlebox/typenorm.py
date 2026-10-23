@@ -9,6 +9,28 @@ with the same shape land in the same class.
 
 from __future__ import annotations
 
+from contextvars import ContextVar
+
+#: Set only while ``normalize_decl`` runs: the type parameters in scope of the
+#: declaration being normalized. ``None`` (the default) is plain ``normalize``.
+_DECL: ContextVar[frozenset[str] | None] = ContextVar("_DECL", default=None)
+
+
+def _obj(base: str, args: list[str], recurse) -> str:
+    """``obj:<base>`` -- with its arguments (``obj:Tree<typevar:T>``) only under
+    ``normalize_decl``, so function signatures keep their old normal form."""
+    if _DECL.get() is None or not args:
+        return f"obj:{base}"
+    return f"obj:{base}<" + ",".join(recurse(a) for a in args) + ">"
+
+
+def _named(name: str) -> str:
+    """A bare type name: ``typevar:<T>`` when it is a type parameter of the
+    declaration being normalized, else ``obj:<name>``."""
+    params = _DECL.get()
+    if params and name in params:
+        return f"typevar:{name}"
+    return f"obj:{name}"
 
 def _split_top(s: str, sep: str) -> list[str]:
     """Split on sep, ignoring separators nested inside any bracket pair."""
@@ -96,10 +118,10 @@ def _py(s: str) -> str:
             return "fn"
         if base in ("Awaitable", "Coroutine"):
             return _py(args[-1])
-        return f"obj:{base.rsplit('.', 1)[-1]}"
+        return _obj(base.rsplit('.', 1)[-1], args, _py)
     if s in _PY_SIMPLE:
         return _PY_SIMPLE[s]
-    return f"obj:{s.rsplit('.', 1)[-1]}"
+    return _named(s.rsplit('.', 1)[-1])
 
 
 # ---------------------------------------------------------------- ts / js
@@ -141,10 +163,10 @@ def _ts(s: str) -> str:
             return _ts(args[0])
         if base in ("Partial", "Required", "Readonly"):
             return _ts(args[0])
-        return f"obj:{base}"
+        return _obj(base, args, _ts)
     if s in _TS_SIMPLE:
         return _TS_SIMPLE[s]
-    return f"obj:{s}"
+    return _named(s)
 
 
 # ---------------------------------------------------------------- go
@@ -161,6 +183,9 @@ def _go(s: str | None) -> str:
     s = s.strip()
     if not s:
         return "unit"
+    if s.startswith("*") and _DECL.get() is not None:
+        # a pointer field is how Go spells "may be absent" (nil)
+        return f"option<{_go(s[1:])}>"
     while s.startswith("*"):
         s = s[1:].strip()
     if s.startswith("..."):
@@ -195,7 +220,10 @@ def _go(s: str | None) -> str:
         return "fn"
     if s.startswith("chan ") or s.startswith("<-chan") or s.startswith("chan<-"):
         return f"obj:{s}"
-    return f"obj:{s}"
+    g = _generic(s, "[", "]") if _DECL.get() is not None else None
+    if g and g[0].isidentifier():
+        return _obj(g[0], g[1], _go)
+    return _named(s)
 
 
 def go_return(types: list[str]) -> str:
@@ -266,7 +294,7 @@ def _rust(s: str | None) -> str:
             return f"result<{ok},{err}>"
         if base == "Cow":
             return _rust(args[0]) if args else "any"
-        return f"obj:{base}"
+        return _obj(base, args, _rust)
     if s in ("String", "str", "char"):
         return "str"
     if s in _RUST_INT:
@@ -275,7 +303,7 @@ def _rust(s: str | None) -> str:
         return "f64"
     if s == "bool":
         return "bool"
-    return f"obj:{s}"
+    return _named(s)
 
 
 # ------------------------------------------------------- table-driven (profiles)
@@ -339,7 +367,7 @@ def _table(s: str, table: dict) -> str:
             return f"iter<{_table(args[0], table) if args else 'any'}>"
         if short in table.get("unwrap_bases", ()):
             return _table(args[0], table) if args else "any"
-        return f"obj:{short}"
+        return _obj(short, args, lambda a: _table(a, table))
     short = s.rsplit(".", 1)[-1]
     if short in simple:
         return simple[short]
@@ -353,7 +381,7 @@ def _table(s: str, table: dict) -> str:
         return "set<any>"
     if short in table.get("iter_bases", ()):
         return "iter<any>"
-    return f"obj:{short}"
+    return _named(short)
 
 
 # ---------------------------------------------------------------- entry
@@ -400,3 +428,22 @@ def normalize(raw: str | None, language: str) -> str:
     result = fn(" ".join(raw.split()))
     # guard: any residue outside the core-1 grammar makes the type unusable downstream
     return result if _is_clean_core1(result) else "any"
+
+
+def normalize_decl(raw: str | None, language: str, type_params=()) -> str:
+    """Normalize the type of a field in a data-structure declaration (#44).
+
+    The same mapping as ``normalize``, with three differences that only matter
+    inside a declaration, so function signatures (and the signature classes
+    built from them) are unchanged:
+
+    - a name in ``type_params`` becomes ``typevar:<T>`` instead of ``obj:<T>``;
+    - a user generic keeps its arguments: ``obj:Tree<typevar:T>``, not ``obj:Tree``;
+    - a Go pointer is ``option<T>``: a field holding ``*T`` is how Go says
+      "may be absent".
+    """
+    token = _DECL.set(frozenset(type_params))
+    try:
+        return normalize(raw, language)
+    finally:
+        _DECL.reset(token)

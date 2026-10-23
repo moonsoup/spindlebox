@@ -101,6 +101,32 @@ class RawFnTable:
     address: str | None = None
 
 
+@dataclass
+class RawType:
+    """A data-structure declaration, as one extractor found it (#44).
+
+    ``kind`` is ``record`` (``fields``) or ``variant`` (``variants``). A variant
+    whose fields are ``None`` names another declared type -- a sum spelled as a
+    list of types (Java's ``permits``, Python's ``Card | Cash``) -- and
+    ``build_index`` takes that record's fields. Field types are raw source text
+    in ``language``; ``build_index`` normalizes them. ``strict`` marks a sum the
+    extractor inferred from an ordinary expression (Python's ``A | B`` is also a
+    bit mask): it is kept only if every named member resolves to a record.
+    """
+    name: str
+    kind: str
+    file: str
+    start_line: int
+    end_line: int
+    language: str
+    type_params: list[str] = field(default_factory=list)
+    fields: list[tuple[str, str | None]] = field(default_factory=list)
+    variants: list[tuple[str, list[tuple[str, str | None]] | None]] = \
+        field(default_factory=list)
+    scope_chain: list[str] = field(default_factory=list)
+    strict: bool = False
+
+
 def _register_profiles() -> None:
     """Extend the language tables with declaratively-profiled languages."""
     from spindlebox.extract.profile_registry import all_profiles

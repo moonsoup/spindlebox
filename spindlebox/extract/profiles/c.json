@@ -103,5 +103,6 @@
     "param_calls": {"unwrap": ["^\\(\\*\\s*([A-Za-z_]\\w*)\\s*\\)$"]},
     "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "subscript_expression", "object": "argument"}]}
   },
-  "fn_tables": {"declarations": [{"node": "init_declarator", "name": "declarator", "value": "value"}], "unwrap": {"pointer_expression": "argument"}, "containers": {"initializer_list": {"entries": {"initializer_pair": {"key": "designator", "value": "value"}}}}, "members": ["identifier"], "keys": {"field_designator": "str", "subscript_designator": "int"}}
+  "fn_tables": {"declarations": [{"node": "init_declarator", "name": "declarator", "value": "value"}], "unwrap": {"pointer_expression": "argument"}, "containers": {"initializer_list": {"entries": {"initializer_pair": {"key": "designator", "value": "value"}}}}, "members": ["identifier"], "keys": {"field_designator": "str", "subscript_designator": "int"}},
+  "datatypes": {"unsupported": "C has struct, union and enum declarations; they are not read yet (#44 covers Python, Go, Rust, TypeScript and Java)."}
 }

@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import re
 
-from spindlebox.extract.base import RawDecl, RawFnTable, RawParam
+from spindlebox.extract.base import RawDecl, RawFnTable, RawParam, RawType
 from spindlebox.extract.profile_registry import (
     CONSTRUCTS,
     LanguageProfile,
+    datatypes_for,
     fn_tables_for,
     meta_spec,
 )
@@ -681,6 +682,209 @@ def extract_fn_tables_with_profile(profile: LanguageProfile, rel_path: str,
     return out
 
 
+# ------------------------------------------------------- data structures (#44)
+
+def _path(node, path):
+    """Follow ``path`` -- a field name, an index into the named children, or a
+    list of those -- from ``node``; None if any step is missing."""
+    steps = path if isinstance(path, list) else [path]
+    for step in steps:
+        if node is None:
+            return None
+        node = _pick(node, step)
+    return node
+
+
+def _name_at(node, where) -> str | None:
+    """The name of ``node``: itself when ``where`` is None, else what ``where`` picks."""
+    target = node if where is None else _path(node, where)
+    return text(target) or None if target is not None else None
+
+
+class _TypeWalker:
+    """Reads the type declarations a profile's ``datatypes`` spec describes."""
+
+    def __init__(self, profile: LanguageProfile, rel_path: str, source: str, spec: dict):
+        self.p, self.rel, self.spec = profile, rel_path, spec
+        self.walker = ProfileWalker(profile, rel_path, source)
+        self.root = self.walker.root
+
+    def scope(self, node) -> list[str]:
+        scopes = set(self.spec.get("scopes", ()))
+        out: list[str] = []
+        p = node.parent
+        while p is not None:
+            if p.type in scopes:
+                name = p.child_by_field_name("name")
+                if name is not None:
+                    out.append(text(name))
+            p = p.parent
+        return out[::-1]
+
+    def type_params(self, node, where) -> list[str]:
+        holder = _path(node, where) if where is not None else None
+        if holder is None:
+            return []
+        spec = self.spec.get("type_params", {})
+        out: list[str] = []
+        for child in holder.named_children:
+            if child.type in spec:
+                where_name = spec[child.type]
+                names = child.children_by_field_name(where_name) \
+                    if isinstance(where_name, str) else []
+                if names:
+                    out += [text(n) for n in names]
+                else:
+                    name = _name_at(child, where_name)
+                    if name:
+                        out.append(name)
+        return out
+
+    def fields(self, container) -> list[tuple[str, str | None]] | None:
+        """Fields of a field-list node, or None when it is not a field list the
+        spec knows (a shape the index would otherwise show as empty)."""
+        if container is None:
+            return []
+        spec = self.spec.get("fields", {}).get(container.type)
+        if spec is None:
+            return None
+        if "positional" in spec:
+            return [(str(i), text(t)) for i, t in
+                    enumerate(container.children_by_field_name(spec["positional"]))]
+        out: list[tuple[str, str | None]] = []
+        for child in container.named_children:
+            if child.type not in spec["node"]:
+                continue
+            type_node = _path(child, spec["type"])
+            raw = text(type_node) if type_node is not None else None
+            mark = spec.get("optional_mark")
+            if raw is not None and mark and any(c.type == mark for c in child.children):
+                raw = spec["optional_spelling"].format(raw)
+            names = [text(n) for n in child.children_by_field_name(spec["name"])]
+            if not names and spec.get("embedded") and raw:
+                names = [re.split(r"[.\s*\[]", raw.lstrip("*"))[-1] or raw]
+            out += [(n, raw) for n in names]
+        return out
+
+    def _base(self, node, d: dict, kind: str, **kw) -> RawType:
+        return RawType(name=_name_at(node, d.get("name", "name")) or "", kind=kind,
+                       file=self.rel, start_line=node.start_point[0] + 1,
+                       end_line=node.end_point[0] + 1, language=self.p.language,
+                       type_params=self.type_params(node, d.get("type_params")),
+                       scope_chain=self.scope(node), **kw)
+
+    @staticmethod
+    def _required(node, d: dict) -> bool:
+        for where, node_type in d.get("require", {}).items():
+            got = node.child_by_field_name(where)
+            if got is None or (node_type is not None and got.type != node_type):
+                return False
+        return True
+
+    def record(self, node, d: dict) -> RawType | None:
+        fields = self.fields(_path(node, d["fields"]))
+        return None if fields is None else self._base(node, d, "record", fields=fields)
+
+    def enum(self, node, d: dict) -> RawType | None:
+        body = _path(node, d["body"])
+        variants: list = []
+        for child in (body.named_children if body is not None else []):
+            v = d["variants"].get(child.type)
+            if v is None:
+                continue
+            fields = self.fields(_path(child, v["fields"])) if v.get("fields") else []
+            if fields is None:
+                return None
+            variants.append((_name_at(child, v.get("name")), fields))
+        return self._base(node, d, "variant", variants=variants)
+
+    def union(self, node, d: dict) -> RawType | None:
+        """A sum spelled as a list of types: names of other types (``refs``),
+        inline object types tagged by a literal-typed field (``inline``), or bare
+        literals (``tags``). Anything else in the list makes it not a sum."""
+        top = _path(node, d["members"])
+        flatten = set(d.get("flatten", ()))
+        leaves: list = []
+
+        def gather(n):
+            if n.type in flatten:
+                for c in n.named_children:
+                    gather(c)
+            else:
+                leaves.append(n)
+        if top is None:
+            return None
+        if d.get("descend"):
+            leaves = [n for n in walk(top) if n.type in d.get("refs", ())]
+        else:
+            gather(top)
+        variants: list = []
+        for leaf in leaves:
+            if leaf.type in d.get("refs", ()):
+                variants.append((text(leaf), None))
+            elif leaf.type in d.get("tags", ()) and _quoted(text(leaf)):
+                variants.append((_quoted(text(leaf)), []))
+            elif leaf.type in d.get("inline", ()):
+                fields = self.fields(leaf)
+                tag = [f for f in fields or [] if _quoted(f[1] or "")]
+                if fields is None or len(tag) != 1:
+                    return None
+                variants.append((_quoted(tag[0][1]), [f for f in fields if f is not tag[0]]))
+            else:
+                return None
+        if len(variants) < 2:
+            return None
+        return self._base(node, d, "variant", variants=variants)
+
+    def run(self) -> list[RawType]:
+        rules = [(d, self.record) for d in self.spec.get("records", ())] \
+            + [(d, self.enum) for d in self.spec.get("enums", ())] \
+            + [(d, self.union) for d in self.spec.get("unions", ())]
+        by_node: dict[str, list] = {}
+        for d, fn in rules:
+            by_node.setdefault(d["node"], []).append((d, fn))
+        out: list[RawType] = []
+        for node in walk(self.root):
+            for d, fn in by_node.get(node.type, ()):
+                if not self._required(node, d):
+                    continue
+                t = fn(node, d)
+                if t is not None and t.name:
+                    out.append(t)
+                    break
+        for name in self.spec.get("hooks", ()):
+            out += HOOKS[name](self)
+        out.sort(key=lambda t: (t.start_line, t.name))
+        return out
+
+
+def _quoted(s: str) -> str | None:
+    """The contents of a quoted string literal, else None."""
+    s = s.strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'`":
+        return s[1:-1]
+    return None
+
+
+def extract_types_with_profile(profile: LanguageProfile, rel_path: str,
+                               source: str) -> list[RawType]:
+    """The data-structure declarations in one file, as the profile's ``datatypes``
+    spec spells them (#44); ``[]`` when the language declares none.
+
+    The spec: ``records`` / ``enums`` / ``unions`` (each a list of rules: the
+    declaration ``node``, where its ``name`` and ``type_params`` are, a
+    ``require`` guard of field -> node type, and where its members are),
+    ``fields`` (field-list node -> which children are fields and where their
+    name and type are, or ``positional``), ``type_params`` (parameter node ->
+    where its name is), ``scopes`` (nodes whose name prefixes a nested
+    declaration's) and ``hooks`` for idioms no node pattern captures.
+    """
+    spec = datatypes_for(profile.language)
+    if not spec:
+        return []
+    return _TypeWalker(profile, rel_path, source, spec).run()
+
+
 # ------------------------------------------------------------- hook library
 
 @hook("go_multi_return")
@@ -1232,3 +1436,81 @@ def _c_function(walker: ProfileWalker, node, spec, scope, classes, anc_declared,
                 returns_fn=returns_fn)
     walker._visit(node, [*scope, name], classes,
                   anc_declared | walker._declared(node), True)
+
+
+@hook("go_const_enums")
+def _go_const_enums(tw: _TypeWalker) -> list[RawType]:
+    """``type Status int`` plus a ``const`` block of ``Pending Status = iota``,
+    ``Paid``, ``Shipped``: Go's enum. A const spec with no type and no value
+    repeats the previous one's, so it continues the enum."""
+    named: dict[str, object] = {}
+    for node in walk(tw.root):
+        if node.type == "type_spec":
+            t = node.child_by_field_name("type")
+            if t is not None and t.type == "type_identifier":
+                named[text(node.child_by_field_name("name"))] = node
+    members: dict[str, list[str]] = {}
+    for node in walk(tw.root):
+        if node.type != "const_declaration":
+            continue
+        current = None
+        for spec in node.named_children:
+            if spec.type != "const_spec":
+                continue
+            t = spec.child_by_field_name("type")
+            if t is not None:
+                current = text(t)
+            elif spec.child_by_field_name("value") is not None:
+                current = None
+            if current in named:
+                members.setdefault(current, []).extend(
+                    text(n) for n in spec.children_by_field_name("name"))
+    out = []
+    for name, ms in members.items():
+        node = named[name]
+        out.append(RawType(name=name, kind="variant", file=tw.rel,
+                           start_line=node.start_point[0] + 1, end_line=node.end_point[0] + 1,
+                           language=tw.p.language, scope_chain=tw.scope(node),
+                           variants=[(m, []) for m in ms]))
+    return out
+
+
+@hook("go_sealed_interfaces")
+def _go_sealed_interfaces(tw: _TypeWalker) -> list[RawType]:
+    """An interface whose only methods are unexported markers taking and
+    returning nothing (``interface{ isPayment() }``) is a closed sum: no type
+    outside the package can implement it. Its variants are the types in this
+    file with a method of that name, in the order they are declared."""
+    order: dict[str, int] = {}
+    markers: dict[str, set[str]] = {}
+    ifaces = []
+    for node in walk(tw.root):
+        if node.type == "type_spec":
+            name = text(node.child_by_field_name("name"))
+            order.setdefault(name, len(order))
+            t = node.child_by_field_name("type")
+            if t is None or t.type != "interface_type":
+                continue
+            elems = [c for c in t.named_children if "comment" not in c.type]
+            if elems and all(
+                    e.type == "method_elem" and text(e.child_by_field_name("name"))[:1].islower()
+                    and not text(e.child_by_field_name("parameters")).strip("() \t")
+                    and e.child_by_field_name("result") is None for e in elems):
+                ifaces.append((node, {text(e.child_by_field_name("name")) for e in elems}))
+        elif node.type == "method_declaration":
+            recv = node.child_by_field_name("receiver")
+            types = [text(n) for n in walk(recv) if n.type == "type_identifier"] if recv else []
+            if types:
+                markers.setdefault(text(node.child_by_field_name("name")), set()).add(types[0])
+    out = []
+    for node, methods in ifaces:
+        impl = set.intersection(*(markers.get(m, set()) for m in methods))
+        if not impl:
+            continue
+        ranked = sorted(impl, key=lambda n: (order.get(n, len(order)), n))
+        out.append(RawType(name=text(node.child_by_field_name("name")), kind="variant",
+                           file=tw.rel, start_line=node.start_point[0] + 1,
+                           end_line=node.end_point[0] + 1, language=tw.p.language,
+                           type_params=tw.type_params(node, "type_parameters"),
+                           scope_chain=tw.scope(node), variants=[(n, None) for n in ranked]))
+    return out

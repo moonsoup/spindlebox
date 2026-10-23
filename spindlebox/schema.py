@@ -21,6 +21,9 @@ GROUP_KINDS = {"package", "module", "class"}
 #: literal, a ``registry`` filled by ``register(fn)`` or a registering decorator,
 #: or packaging ``entry_points``.
 FN_TABLE_KINDS = {"dict", "list", "registry", "entry_points"}
+#: A ``TypeDecl`` (#44) is a ``record`` (named fields) or a ``variant`` (a closed
+#: set of alternatives, each with its own fields -- an enum when none have any).
+TYPE_KINDS = {"record", "variant"}
 
 
 class SchemaError(Exception):
@@ -322,6 +325,66 @@ class FnTable:
         )
 
 
+def _fields_from(raw: list, ctx: str) -> list[dict]:
+    return [{"name": _req(f, "name", ctx), "type": _req(f, "type", ctx),
+             "raw_type": f.get("raw_type")} for f in raw]
+
+
+@dataclass
+class TypeDecl:
+    """A data structure declared in the source (#44), in core-1 types.
+
+    ``fields`` are ``{"name", "type", "raw_type"}`` in declaration order, ``type``
+    normalized (a type parameter is ``typevar:<T>``; a generic user type keeps its
+    arguments, ``obj:Tree<typevar:T>``). A ``variant``'s ``variants`` are
+    ``{"name", "fields"}`` in declaration order. ``unresolved`` names the
+    alternatives of a sum spelled as a list of types (``permits Card, Cash``)
+    that no indexed record matched, so their empty ``fields`` mean "unknown".
+    """
+    name: str
+    address: str
+    kind: str  # TYPE_KINDS
+    language: str
+    file: str
+    span: tuple[int, int]
+    type_params: list[str] = field(default_factory=list)
+    fields: list[dict] = field(default_factory=list)
+    variants: list[dict] = field(default_factory=list)
+    unresolved: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        d = {"name": self.name, "address": self.address, "kind": self.kind,
+             "language": self.language, "file": self.file, "span": list(self.span),
+             "type_params": self.type_params}
+        if self.kind == "record":
+            d["fields"] = self.fields
+        else:
+            d["variants"] = self.variants
+        if self.unresolved:
+            d["unresolved"] = self.unresolved
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict) -> TypeDecl:
+        ctx = f"type '{d.get('address', d.get('name', '?'))}'"
+        span = _req(d, "span", ctx)
+        kind = _enum(_req(d, "kind", ctx), TYPE_KINDS, "type kind", ctx)
+        return cls(
+            name=_req(d, "name", ctx),
+            address=_req(d, "address", ctx),
+            kind=kind,
+            language=_req(d, "language", ctx),
+            file=_req(d, "file", ctx),
+            span=(int(span[0]), int(span[1])),
+            type_params=list(_req(d, "type_params", ctx)),
+            fields=_fields_from(d.get("fields", []), ctx),
+            variants=[{"name": _req(v, "name", ctx),
+                       "fields": _fields_from(v.get("fields", []), ctx)}
+                      for v in d.get("variants", [])],
+            unresolved=list(d.get("unresolved", [])),
+        )
+
+
 @dataclass
 class Pipeline:
     name: str
@@ -388,6 +451,10 @@ class ScaIndex:
     #: Serialized as a top-level section, omitted when empty so an index without
     #: tables keeps exactly the keys other projects read by hand.
     fn_tables: list[FnTable] = field(default_factory=list)
+    #: Data structures declared in the source (#44); see ``TypeDecl``. Only
+    #: meaningful on an index whose ``markers`` include ``types``. Serialized as
+    #: a top-level section, omitted when empty, like ``fn_tables``.
+    types: list[TypeDecl] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         d = {
@@ -415,6 +482,8 @@ class ScaIndex:
             d["project"]["constructs"] = self.constructs
         if self.fn_tables:
             d["fn_tables"] = [t.to_dict() for t in self.fn_tables]
+        if self.types:
+            d["types"] = [t.to_dict() for t in self.types]
         return d
 
     @classmethod
@@ -445,6 +514,7 @@ class ScaIndex:
             markers=list(project.get("markers", [])),
             constructs={k: list(v) for k, v in project.get("constructs", {}).items()},
             fn_tables=[FnTable.from_dict(t) for t in d.get("fn_tables", [])],
+            types=[TypeDecl.from_dict(t) for t in d.get("types", [])],
         )
 
     def save(self, path: str | Path) -> None:

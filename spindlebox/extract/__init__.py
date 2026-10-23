@@ -14,6 +14,7 @@ from spindlebox.extract.base import (
     STATE_TO_TRAIT,
     RawDecl,
     RawFnTable,
+    RawType,
     discover_files,
     normalize_langs,
 )
@@ -33,18 +34,20 @@ from spindlebox.schema import (
     Param,
     ScaIndex,
     Signature,
+    TypeDecl,
 )
 from spindlebox.sigclass import build_signature_classes, partition_op_arrays, sig_class_id
 from spindlebox.staleness import snapshot_files
-from spindlebox.typenorm import normalize
+from spindlebox.typenorm import normalize, normalize_decl
 
 #: Every marker ``build_index`` writes. See ``ScaIndex.markers``. The six after
 #: ``entry_points`` are the function-as-value constructs of #39; which of them
 #: each language has is in ``ScaIndex.constructs``. ``fn_tables`` says the
-#: index looked for data structures holding functions (#40).
+#: index looked for data structures holding functions (#40); ``types`` that it
+#: read the data structures the source declares (#44).
 INDEX_MARKERS = ("builtin_calls", "stdlib_calls", "entry_points",
                  "decorators", "parent", "takes_fn", "returns_fn",
-                 "param_calls", "table_calls", "fn_tables")
+                 "param_calls", "table_calls", "fn_tables", "types")
 
 #: Call markers extraction resolves itself; ``resolve_calls`` never sees them.
 _INDIRECT_CALLS = ("param:", "table:")
@@ -89,6 +92,20 @@ def _extract_fn_tables(lang: str, rel: str, source: str, file_decls: list[RawDec
     return {"tables": [], "registrars": [], "registrations": []}
 
 
+def _extract_types(lang: str, rel: str, source: str) -> list[RawType]:
+    """The data structures one file declares (#44), as its language's profile
+    (or, for Python, its native extractor) says they are spelled."""
+    from spindlebox.extract.profile_registry import profile_for
+    prof = profile_for(lang)
+    if prof is not None and prof.walker:
+        from spindlebox.extract.profile_lang import extract_types_with_profile
+        return extract_types_with_profile(prof, rel, source)
+    if lang == "python":
+        from spindlebox.extract.py_lang import extract_python_types
+        return extract_python_types(rel, source)
+    return []
+
+
 def _norm_param_type(p_raw: str | None, kind: str, language: str) -> str:
     if kind == "variadic":
         elem = normalize(p_raw, language) if p_raw else "any"
@@ -127,6 +144,7 @@ def build_index(
     # to it is exactly the change a caller needs to know about.
     read_files: list[str] = []
     raw_fn: dict[str, list] = {"tables": [], "registrars": [], "registrations": []}
+    raw_types: list[RawType] = []
     for rel, lang in discover_files(root, lang_list):
         try:
             source = (root / rel).read_text(errors="replace")
@@ -137,10 +155,12 @@ def build_index(
         try:
             file_decls = _extract_file(lang, rel, source)
             found = _extract_fn_tables(lang, rel, source, file_decls)
+            file_types = _extract_types(lang, rel, source)
         except SyntaxError as e:
             errors.append(f"{rel}: parse failed ({e})")
             continue
         decls.extend(file_decls)
+        raw_types.extend(file_types)
         for k, v in found.items():
             raw_fn[k].extend(v)
     # the entry points a Python package declares are tables too (#40)
@@ -280,6 +300,7 @@ def build_index(
         constructs={lang: declared_constructs(lang)
                     for lang in sorted({i.language for i in items})},
         fn_tables=fn_tables,
+        types=_resolve_types(raw_types),
     )
     if errors:
         index.parse_errors = errors  # serialized: an index must never hide skipped files
@@ -298,6 +319,60 @@ def _table_address(call: str, d: RawDecl, item: Item, address_of: dict[int, str]
         rest = name.split(".", 1)[1] if "." in name else name
         return "table:" + ".".join([*module_parts(d.file), *d.class_chain, rest])
     return "table:" + ".".join([*module_parts(d.file), name])
+
+
+def _resolve_types(raw: list[RawType]) -> list[TypeDecl]:
+    """Raw declarations -> ``TypeDecl``s with core-1 field types (#44).
+
+    A variant alternative that names another type (``fields`` None) takes that
+    record's fields: the record of that name in the same file, else the only one
+    in the index. One that matches none is kept with no fields and listed in
+    ``unresolved`` -- except in a ``strict`` sum, which is dropped instead, since
+    it may not have been a type at all.
+    """
+    records: dict[str, list[RawType]] = {}
+    for t in raw:
+        if t.kind == "record":
+            records.setdefault(t.name, []).append(t)
+
+    def norm(fields, t: RawType) -> list[dict]:
+        return [{"name": n, "type": normalize_decl(r, t.language, t.type_params),
+                 "raw_type": r} for n, r in fields]
+
+    def record_for(name: str, t: RawType) -> RawType | None:
+        cands = records.get(name, [])
+        local = [r for r in cands if r.file == t.file]
+        for pool in (local, cands):
+            if len(pool) == 1:
+                return pool[0]
+        return None
+
+    out: list[TypeDecl] = []
+    used: set[str] = set()
+    for t in sorted(raw, key=lambda t: (t.file, t.start_line, t.name)):
+        variants: list[dict] = []
+        unresolved: list[str] = []
+        for name, fields in t.variants:
+            if fields is None:
+                rec = record_for(name, t)
+                if rec is None:
+                    unresolved.append(name)
+                    fields = []
+                else:
+                    variants.append({"name": name, "fields": norm(rec.fields, rec)})
+                    continue
+            variants.append({"name": name, "fields": norm(fields, t)})
+        if unresolved and t.strict:
+            continue
+        address = ".".join([*module_parts(t.file), *t.scope_chain, t.name])
+        if address in used:
+            address = f"{address}~{t.start_line}"
+        used.add(address)
+        out.append(TypeDecl(
+            name=t.name, address=address, kind=t.kind, language=t.language, file=t.file,
+            span=(t.start_line, t.end_line), type_params=list(t.type_params),
+            fields=norm(t.fields, t), variants=variants, unresolved=unresolved))
+    return out
 
 
 def _member_resolver(items: list[Item], address_of: dict[int, str]):

@@ -56,5 +56,6 @@
     "param_calls": {},
     "table_calls": {"calls": [{"node": "call_expression", "callee": "function", "subscript": "index_expression", "object": null}]}
   },
-  "fn_tables": {"declarations": [{"node": "static_item", "name": "name", "value": "value"}, {"node": "const_item", "name": "name", "value": "value"}], "unwrap": {"reference_expression": "value"}, "containers": {"array_expression": {"entries": {"tuple_expression": {"key": 0, "value": -1}}}}, "members": ["identifier"], "keys": {"string_literal": "str", "integer_literal": "int"}}
+  "fn_tables": {"declarations": [{"node": "static_item", "name": "name", "value": "value"}, {"node": "const_item", "name": "name", "value": "value"}], "unwrap": {"reference_expression": "value"}, "containers": {"array_expression": {"entries": {"tuple_expression": {"key": 0, "value": -1}}}}, "members": ["identifier"], "keys": {"string_literal": "str", "integer_literal": "int"}},
+  "datatypes": {"records": [{"node": "struct_item", "name": "name", "type_params": "type_parameters", "fields": "body"}], "enums": [{"node": "enum_item", "name": "name", "type_params": "type_parameters", "body": "body", "variants": {"enum_variant": {"name": "name", "fields": "body"}}}], "fields": {"field_declaration_list": {"node": ["field_declaration"], "name": "name", "type": "type"}, "ordered_field_declaration_list": {"positional": "type"}}, "type_params": {"type_parameter": "name", "constrained_type_parameter": "left", "type_identifier": null}, "scopes": ["mod_item"]}
 }

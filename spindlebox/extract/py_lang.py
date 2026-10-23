@@ -7,7 +7,7 @@ import builtins
 import re
 import symtable
 
-from spindlebox.extract.base import RawDecl, RawFnTable, RawParam
+from spindlebox.extract.base import RawDecl, RawFnTable, RawParam, RawType
 from spindlebox.typenorm import normalize
 
 _FUNC_NODES = (ast.FunctionDef, ast.AsyncFunctionDef)
@@ -593,4 +593,116 @@ def pyproject_fn_tables(text: str, rel_path: str = "pyproject.toml") -> list[Raw
             name=path[-1], file=rel_path, start_line=start, end_line=end,
             kind="entry_points", key_type="str", members=refs, qualified=True,
             address=".".join(["pyproject", *path])))
+    return out
+
+
+# ------------------------------------------------------- data structures (#44)
+
+#: Python's ``datatypes`` block, in the shape a profile's takes: which spellings
+#: declare a record or an enum. Matched on the last dotted segment.
+PY_DATATYPES = {
+    "record_decorators": ["dataclass", "define", "frozen", "mutable", "s", "attrs"],
+    "record_bases": ["NamedTuple", "TypedDict", "BaseModel"],
+    "enum_bases": ["Enum", "IntEnum", "StrEnum", "Flag", "IntFlag"],
+    "generic_bases": ["Generic", "Protocol"],
+}
+
+
+def _last(node: ast.AST) -> str | None:
+    d = _dotted(node.func if isinstance(node, ast.Call) else node)
+    return d.rsplit(".", 1)[-1] if d else None
+
+
+def _class_type_params(cls: ast.ClassDef) -> list[str]:
+    params = [p.name for p in getattr(cls, "type_params", ()) or ()]   # PEP 695
+    for base in cls.bases:
+        if isinstance(base, ast.Subscript) and _last(base.value) in PY_DATATYPES["generic_bases"]:
+            sl = base.slice
+            for e in (sl.elts if isinstance(sl, ast.Tuple) else [sl]):
+                if isinstance(e, ast.Name) and e.id not in params:
+                    params.append(e.id)
+    return params
+
+
+def _union_members(value: ast.AST) -> list[str] | None:
+    """``A | B | C`` or ``Union[A, B, C]`` -> the names, when every operand is a
+    plain or dotted name (and not ``None``); else None."""
+    if isinstance(value, ast.BinOp) and isinstance(value.op, ast.BitOr):
+        left, right = _union_members(value.left), _union_members(value.right)
+        return left + right if left is not None and right is not None else None
+    if isinstance(value, ast.Subscript) and _last(value.value) == "Union":
+        sl = value.slice
+        out: list[str] = []
+        for e in (sl.elts if isinstance(sl, ast.Tuple) else [sl]):
+            m = _union_members(e)
+            if m is None:
+                return None
+            out += m
+        return out
+    d = _dotted(value)
+    if d is None or d == "None":
+        return None
+    return [d.rsplit(".", 1)[-1]]
+
+
+def extract_python_types(rel_path: str, source: str) -> list[RawType]:
+    """Records, enums and unions declared at module or class level (#44).
+
+    A record is a class with a record decorator or base (``PY_DATATYPES``); its
+    fields are its annotated class attributes, ``ClassVar`` excluded. An enum is a
+    class with an enum base; its variants are its assigned names. A union is a
+    module-level alias of two or more names joined by ``|`` or ``Union[...]``
+    (``Payment = Card | Transfer | Cash``); since that is also how a bit mask is
+    spelled, it is ``strict`` and kept only if every member is a record.
+    """
+    tree = ast.parse(source, filename=rel_path)
+    out: list[RawType] = []
+
+    def segment(node: ast.AST | None) -> str | None:
+        if node is None:
+            return None
+        return ast.get_source_segment(source, node) or ast.unparse(node)
+
+    def visit(body: list[ast.stmt], scope: list[str]) -> None:
+        for node in body:
+            if isinstance(node, ast.ClassDef):
+                base_names = {_last(b.value if isinstance(b, ast.Subscript) else b)
+                              for b in node.bases}
+                decos = {_last(d) for d in node.decorator_list}
+                common = dict(name=node.name, file=rel_path, start_line=node.lineno,
+                              end_line=node.end_lineno or node.lineno, language="python",
+                              type_params=_class_type_params(node), scope_chain=list(scope))
+                if base_names & set(PY_DATATYPES["enum_bases"]):
+                    names = [t.id for st in node.body if isinstance(st, ast.Assign)
+                             for t in st.targets
+                             if isinstance(t, ast.Name) and not t.id.startswith("_")]
+                    out.append(RawType(kind="variant", variants=[(n, []) for n in names],
+                                       **common))
+                elif (decos & set(PY_DATATYPES["record_decorators"])
+                      or base_names & set(PY_DATATYPES["record_bases"])):
+                    fields = [(st.target.id, segment(st.annotation)) for st in node.body
+                              if isinstance(st, ast.AnnAssign) and isinstance(st.target, ast.Name)
+                              and "ClassVar" not in (segment(st.annotation) or "")]
+                    out.append(RawType(kind="record", fields=fields, **common))
+                visit(node.body, [*scope, node.name])
+            elif not scope and isinstance(node, ast.Assign | ast.AnnAssign):
+                targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+                if len(targets) != 1 or not isinstance(targets[0], ast.Name) or node.value is None:
+                    continue
+                members = _union_members(node.value)
+                if members is None or len(members) < 2:
+                    continue
+                out.append(RawType(
+                    name=targets[0].id, kind="variant", file=rel_path, start_line=node.lineno,
+                    end_line=node.end_lineno or node.lineno, language="python",
+                    variants=[(m, None) for m in members], strict=True))
+            elif not scope and type(node).__name__ == "TypeAlias":    # PEP 695 `type X = ...`
+                members = _union_members(node.value)
+                if members is not None and len(members) >= 2:
+                    out.append(RawType(
+                        name=node.name.id, kind="variant", file=rel_path, start_line=node.lineno,
+                        end_line=node.end_lineno or node.lineno, language="python",
+                        variants=[(m, None) for m in members], strict=True))
+
+    visit(tree.body, [])
     return out
