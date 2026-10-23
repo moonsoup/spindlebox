@@ -1,0 +1,75 @@
+{
+ "block": "gx-test-design",
+ "contract": "spindlebox-gx-tests",
+ "round": "datastructs-r1",
+ "tests": [
+  {
+   "id": "ds-shape",
+   "file": "gx/datastructs/test_ds_index.py",
+   "covers": [
+    "DS-SHAPE"
+   ]
+  },
+  {
+   "id": "ds-model-indexed",
+   "file": "gx/datastructs/test_ds_index.py",
+   "covers": [
+    "DS-PY",
+    "DS-GO",
+    "DS-RS",
+    "DS-TS",
+    "DS-JV"
+   ]
+  },
+  {
+   "id": "ds-parity",
+   "file": "gx/datastructs/test_ds_index.py",
+   "covers": [
+    "DS-PARITY"
+   ]
+  },
+  {
+   "id": "ds-refs",
+   "file": "gx/datastructs/test_ds_index.py",
+   "covers": [
+    "DS-REF"
+   ]
+  },
+  {
+   "id": "ds-sig",
+   "file": "gx/datastructs/test_ds_index.py",
+   "covers": [
+    "DS-SIG"
+   ]
+  },
+  {
+   "id": "ds-round-trip",
+   "file": "gx/datastructs/test_ds_replicate.py",
+   "covers": [
+    "DS-GEN-JAVA",
+    "DS-GEN-RUST"
+   ]
+  },
+  {
+   "id": "ds-javac",
+   "file": "gx/datastructs/test_ds_replicate.py",
+   "covers": [
+    "DS-GEN-JAVA"
+   ]
+  },
+  {
+   "id": "ds-cargo",
+   "file": "gx/datastructs/test_ds_replicate.py",
+   "covers": [
+    "DS-GEN-RUST"
+   ]
+  },
+  {
+   "id": "ds-gen-sig",
+   "file": "gx/datastructs/test_ds_replicate.py",
+   "covers": [
+    "DS-GEN-SIG"
+   ]
+  }
+ ]
+}

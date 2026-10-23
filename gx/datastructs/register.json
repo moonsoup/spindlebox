@@ -1,0 +1,298 @@
+{
+ "block": "gx-requirements",
+ "contract": "spindlebox-gx-tests",
+ "round": "datastructs-r1",
+ "requirements": [
+  {
+   "id": "DS-SHAPE",
+   "statement": "`spindlebox index` writes a top-level `types` list to .spi/index.json. Every entry has `name`, `kind` (record or variant) and `type_params` (a list of names); a record has `fields` [{name, type}] in declaration order, a variant has `variants` [{name, fields}] in declaration order, with `fields` empty for a payload-free variant.",
+   "numeric": false,
+   "parameters": {
+    "canonical": "canonical form: record <Name>[<T,..>]{<field>:<type>,..} | variant <Name>[<T,..>]{<Variant>[{<field>:<type>,..}],..}; type references are obj:<Name>[<args>], type parameters typevar:<Name>, other types core-1 (str, i64, f64, list<>, map<,>, option<>)"
+   },
+   "sources": [
+    {
+     "anchor": "python-3.11.4/dataclasses.rst#using :pep:`526` type annotations.",
+     "digest": "b85e878643b0f16d90ba8bbb211d70c00194fe58a4f62bc9797e6346df7500c6"
+    },
+    {
+     "anchor": "rust-reference/structs.md#A _struct_ is a nominal [struct type] defined with the keyword `struct`.",
+     "digest": "4263909bb55120968f45050a3de1c677c464a77baf8dd34865dfac3793291555"
+    },
+    {
+     "anchor": "rust-reference/enumerations.md#`enum` IDENTIFIER GenericParams?",
+     "digest": "001bcd511ca90341ac2e36bb5f53cb2ef8f3fabc9d120562c46d0e2b9d82d9bb"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-PY",
+   "statement": "Indexing inputs/python/model.py yields the seven model types Money, LineItem, Status, Payment, Order, Tree, Page in exactly the expected canonical forms: a @dataclass is a record of its annotated fields, an Enum is a payload-free variant, a `X | Y | Z` alias of dataclasses is a variant whose payloads are those dataclasses' fields, Optional[X] is option<X>, Generic[T] gives type_params [T].",
+   "numeric": false,
+   "parameters": {
+    "expected": "Money=record Money{amount:i64,currency:str}; LineItem=record LineItem{sku:str,qty:i64,price:obj:Money}; Status=variant Status{Pending,Paid,Shipped}; Payment=variant Payment{Card{last4:str},Transfer{iban:str},Cash}; Order=record Order{id:str,items:list<obj:LineItem>,status:obj:Status,payment:option<obj:Payment>,tags:map<str,list<str>>}; Tree=record Tree<T>{value:typevar:T,children:list<obj:Tree<typevar:T>>}; Page=record Page<T>{items:list<typevar:T>,next:option<str>}",
+    "input": "gx/datastructs/corpus/inputs/python/model.py"
+   },
+   "sources": [
+    {
+     "anchor": "python-3.11.4/dataclasses.rst#using :pep:`526` type annotations.",
+     "digest": "b85e878643b0f16d90ba8bbb211d70c00194fe58a4f62bc9797e6346df7500c6"
+    },
+    {
+     "anchor": "python-3.11.4/enum.rst#is a set of symbolic names (members) bound to unique values",
+     "digest": "4eee787e4fdc438d2261866148a6823d23b2a3b7af4f1b25f8bdbfe904c16d34"
+    },
+    {
+     "anchor": "python-3.11.4/typing.rst#``Union[X, Y]`` is equivalent to ``X | Y`` and means either X or Y.",
+     "digest": "cdd551576923e06714957ba4edaa381dbd44d192bc3c2b9d0a1728233f9b42fa"
+    },
+    {
+     "anchor": "python-3.11.4/typing.rst#``Optional[X]`` is equivalent to ``X | None``",
+     "digest": "cdd551576923e06714957ba4edaa381dbd44d192bc3c2b9d0a1728233f9b42fa"
+    },
+    {
+     "anchor": "python-3.11.4/typing.rst#``Generic[T]`` as a base class defines that the class ``LoggedVar`` takes a",
+     "digest": "cdd551576923e06714957ba4edaa381dbd44d192bc3c2b9d0a1728233f9b42fa"
+    },
+    {
+     "anchor": "inputs/python/model.py#Payment = Card | Transfer | Cash",
+     "digest": "831f55e9abe9a116b824166d39f9fea0ff9a2d830c68a4aa6242d99a9e1bdc47"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-GO",
+   "statement": "Indexing inputs/go/model.go yields the seven model types Money, LineItem, Status, Payment, Order, Tree, Page in exactly the expected canonical forms: a struct is a record, a named integer type with iota constants is a payload-free variant, an interface implemented only by same-package structs through an unexported marker method is a variant of those structs, *X is option<X>, []X is list<X>, map[K]V is map<K,V>, a type parameter list gives type_params.",
+   "numeric": false,
+   "parameters": {
+    "expected": "Money=record Money{amount:i64,currency:str}; LineItem=record LineItem{sku:str,qty:i64,price:obj:Money}; Status=variant Status{Pending,Paid,Shipped}; Payment=variant Payment{Card{last4:str},Transfer{iban:str},Cash}; Order=record Order{id:str,items:list<obj:LineItem>,status:obj:Status,payment:option<obj:Payment>,tags:map<str,list<str>>}; Tree=record Tree<T>{value:typevar:T,children:list<obj:Tree<typevar:T>>}; Page=record Page<T>{items:list<typevar:T>,next:option<str>}",
+    "input": "gx/datastructs/corpus/inputs/go/model.go"
+   },
+   "sources": [
+    {
+     "anchor": "go-1.22.0/go_spec.html#A struct is a sequence of named elements, called fields, each of which has a",
+     "digest": "783fdf67dd27ff9f9a9309c337f902b4c01d5b5bb9014b1db2c190dd785fe438"
+    },
+    {
+     "anchor": "go-1.22.0/go_spec.html#A pointer type denotes the set of all pointers to",
+     "digest": "783fdf67dd27ff9f9a9309c337f902b4c01d5b5bb9014b1db2c190dd785fe438"
+    },
+    {
+     "anchor": "go-1.22.0/go_spec.html#A map is an unordered group of elements of one type, called the",
+     "digest": "783fdf67dd27ff9f9a9309c337f902b4c01d5b5bb9014b1db2c190dd785fe438"
+    },
+    {
+     "anchor": "go-1.22.0/go_spec.html#A slice is a descriptor for a contiguous segment of an",
+     "digest": "783fdf67dd27ff9f9a9309c337f902b4c01d5b5bb9014b1db2c190dd785fe438"
+    },
+    {
+     "anchor": "go-1.22.0/go_spec.html#A type parameter list declares the <i>type parameters</i> of a generic function or type declaration.",
+     "digest": "783fdf67dd27ff9f9a9309c337f902b4c01d5b5bb9014b1db2c190dd785fe438"
+    },
+    {
+     "anchor": "go-1.22.0/go_spec.html#An interface type defines a <i>type set</i>.",
+     "digest": "783fdf67dd27ff9f9a9309c337f902b4c01d5b5bb9014b1db2c190dd785fe438"
+    },
+    {
+     "anchor": "inputs/go/model.go#Pending Status = iota",
+     "digest": "083da7df710fbbe17692a8196fc56e80d303385e9ee133a3471645d7cb4199a5"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-RS",
+   "statement": "Indexing inputs/rust/model.rs yields the seven model types Money, LineItem, Status, Payment, Order, Tree, Page in exactly the expected canonical forms: a struct is a record, an enum is a variant with each variant's named fields as its payload, Vec<X> is list<X>, HashMap<K,V> is map<K,V>, Option<X> is option<X>, String is str.",
+   "numeric": false,
+   "parameters": {
+    "expected": "Money=record Money{amount:i64,currency:str}; LineItem=record LineItem{sku:str,qty:i64,price:obj:Money}; Status=variant Status{Pending,Paid,Shipped}; Payment=variant Payment{Card{last4:str},Transfer{iban:str},Cash}; Order=record Order{id:str,items:list<obj:LineItem>,status:obj:Status,payment:option<obj:Payment>,tags:map<str,list<str>>}; Tree=record Tree<T>{value:typevar:T,children:list<obj:Tree<typevar:T>>}; Page=record Page<T>{items:list<typevar:T>,next:option<str>}",
+    "input": "gx/datastructs/corpus/inputs/rust/model.rs"
+   },
+   "sources": [
+    {
+     "anchor": "rust-reference/structs.md#A _struct_ is a nominal [struct type] defined with the keyword `struct`.",
+     "digest": "4263909bb55120968f45050a3de1c677c464a77baf8dd34865dfac3793291555"
+    },
+    {
+     "anchor": "rust-reference/enumerations.md#`enum` IDENTIFIER GenericParams?",
+     "digest": "001bcd511ca90341ac2e36bb5f53cb2ef8f3fabc9d120562c46d0e2b9d82d9bb"
+    },
+    {
+     "anchor": "inputs/rust/model.rs#Card { last4: String },",
+     "digest": "47ec5a76531a9c3c8388f493c4b29ba72d059a3d6be12bf87b333497261abb6f"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-TS",
+   "statement": "Indexing inputs/typescript/model.ts yields the seven model types Money, LineItem, Status, Payment, Order, Tree, Page: an interface is a record, an enum is a payload-free variant, a union of object types discriminated by a common literal `kind` property is a variant named by those literals with the discriminant dropped from each payload, `X | null` is option<X>, X[] is list<X>, Record<K,V> is map<K,V>. TypeScript's single numeric type `number` normalizes to f64, so Money.amount and LineItem.qty are f64; every other form equals the expected forms.",
+   "numeric": false,
+   "parameters": {
+    "expected": "Money=record Money{amount:i64,currency:str}; LineItem=record LineItem{sku:str,qty:i64,price:obj:Money}; Status=variant Status{Pending,Paid,Shipped}; Payment=variant Payment{Card{last4:str},Transfer{iban:str},Cash}; Order=record Order{id:str,items:list<obj:LineItem>,status:obj:Status,payment:option<obj:Payment>,tags:map<str,list<str>>}; Tree=record Tree<T>{value:typevar:T,children:list<obj:Tree<typevar:T>>}; Page=record Page<T>{items:list<typevar:T>,next:option<str>}",
+    "typescript_numeric": "amount:f64 and qty:f64 in place of i64"
+   },
+   "sources": [
+    {
+     "anchor": "typescript-handbook/Narrowing.md#When every type in a union contains a common property with literal types, TypeScript considers that to be a _discriminated union_",
+     "digest": "4836a29bbb3097085d0b21d0631ac464fcfb2a8719a17f4602e892d2be4f337e"
+    },
+    {
+     "anchor": "typescript-handbook/Object Types.md### Generic Object Types",
+     "digest": "2eea0f3453af5dc3f30c01f4a5a84911fb2b993bbeb674a53e834f4d2a8e679a"
+    },
+    {
+     "anchor": "typescript-handbook/Object Types.md#Just as TypeScript provides a shorthand syntax for `Array<Type>` with `Type[]`",
+     "digest": "2eea0f3453af5dc3f30c01f4a5a84911fb2b993bbeb674a53e834f4d2a8e679a"
+    },
+    {
+     "anchor": "inputs/typescript/model.ts#| { kind: \"Card\"; last4: string }",
+     "digest": "29764a8e0c9ba856a8bea1de4b36940ea15e7b0b6cc2ba914437114749d5bf65"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-JV",
+   "statement": "Indexing inputs/java/Model.java yields the seven model types Money, LineItem, Status, Payment, Order, Tree, Page in exactly the expected canonical forms: a record is a record of its components, an enum is a payload-free variant, a sealed interface is a variant over its permitted records, long is i64, List<X> is list<X>, Map<K,V> is map<K,V>, Optional<X> is option<X>. Nested type names compare by simple name.",
+   "numeric": false,
+   "parameters": {
+    "expected": "Money=record Money{amount:i64,currency:str}; LineItem=record LineItem{sku:str,qty:i64,price:obj:Money}; Status=variant Status{Pending,Paid,Shipped}; Payment=variant Payment{Card{last4:str},Transfer{iban:str},Cash}; Order=record Order{id:str,items:list<obj:LineItem>,status:obj:Status,payment:option<obj:Payment>,tags:map<str,list<str>>}; Tree=record Tree<T>{value:typevar:T,children:list<obj:Tree<typevar:T>>}; Page=record Page<T>{items:list<typevar:T>,next:option<str>}",
+    "input": "gx/datastructs/corpus/inputs/java/Model.java"
+   },
+   "sources": [
+    {
+     "anchor": "inputs/java/Model.java#public sealed interface Payment permits Card, Transfer, Cash {}",
+     "digest": "553fdbeb740307b52c189c8aff25ccbbed942e55571d82cd2d5f9dd27d5b7242"
+    },
+    {
+     "anchor": "inputs/java/Model.java#public record Tree<T>(T value, List<Tree<T>> children) {}",
+     "digest": "553fdbeb740307b52c189c8aff25ccbbed942e55571d82cd2d5f9dd27d5b7242"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-PARITY",
+   "statement": "The five indexes give identical canonical forms for the seven model types, except TypeScript's f64 where the others have i64 (DS-TS). One model is one normalized shape whichever language declared it.",
+   "numeric": false,
+   "sources": [
+    {
+     "anchor": "inputs/python/model.py#class Order:",
+     "digest": "831f55e9abe9a116b824166d39f9fea0ff9a2d830c68a4aa6242d99a9e1bdc47"
+    },
+    {
+     "anchor": "inputs/go/model.go#type Order struct {",
+     "digest": "083da7df710fbbe17692a8196fc56e80d303385e9ee133a3471645d7cb4199a5"
+    },
+    {
+     "anchor": "inputs/rust/model.rs#pub struct Order {",
+     "digest": "47ec5a76531a9c3c8388f493c4b29ba72d059a3d6be12bf87b333497261abb6f"
+    },
+    {
+     "anchor": "inputs/typescript/model.ts#export interface Order {",
+     "digest": "29764a8e0c9ba856a8bea1de4b36940ea15e7b0b6cc2ba914437114749d5bf65"
+    },
+    {
+     "anchor": "inputs/java/Model.java#public record Order(",
+     "digest": "553fdbeb740307b52c189c8aff25ccbbed942e55571d82cd2d5f9dd27d5b7242"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-REF",
+   "statement": "In every index, each obj:<Name> inside a model type's canonical form names a type in that index's `types`, and no model type contains `any`: nothing is erased.",
+   "numeric": false,
+   "sources": [
+    {
+     "anchor": "inputs/python/model.py#price: Money",
+     "digest": "831f55e9abe9a116b824166d39f9fea0ff9a2d830c68a4aa6242d99a9e1bdc47"
+    },
+    {
+     "anchor": "inputs/rust/model.rs#pub items: Vec<LineItem>,",
+     "digest": "47ec5a76531a9c3c8388f493c4b29ba72d059a3d6be12bf87b333497261abb6f"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-SIG",
+   "statement": "In every index the function `total` has exactly one non-receiver parameter of norm_type obj:Order and returns obj:Money.",
+   "numeric": false,
+   "sources": [
+    {
+     "anchor": "inputs/python/model.py#def total(order: Order) -> Money:",
+     "digest": "831f55e9abe9a116b824166d39f9fea0ff9a2d830c68a4aa6242d99a9e1bdc47"
+    },
+    {
+     "anchor": "inputs/go/model.go#func total(order Order) Money {",
+     "digest": "083da7df710fbbe17692a8196fc56e80d303385e9ee133a3471645d7cb4199a5"
+    },
+    {
+     "anchor": "inputs/rust/model.rs#pub fn total(order: Order) -> Money {",
+     "digest": "47ec5a76531a9c3c8388f493c4b29ba72d059a3d6be12bf87b333497261abb6f"
+    },
+    {
+     "anchor": "inputs/typescript/model.ts#export function total(order: Order): Money {",
+     "digest": "29764a8e0c9ba856a8bea1de4b36940ea15e7b0b6cc2ba914437114749d5bf65"
+    },
+    {
+     "anchor": "inputs/java/Model.java#public static Money total(Order order) {",
+     "digest": "553fdbeb740307b52c189c8aff25ccbbed942e55571d82cd2d5f9dd27d5b7242"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-GEN-JAVA",
+   "statement": "For each of the five model indexes, `spindlebox generate --lang java` writes Java that declares the seven model types; javac compiles it; and indexing the generated Java gives back the source index's canonical forms for the seven model types (TypeScript's f64 stays f64).",
+   "numeric": false,
+   "sources": [
+    {
+     "anchor": "inputs/java/Model.java#public record Money(long amount, String currency) {}",
+     "digest": "553fdbeb740307b52c189c8aff25ccbbed942e55571d82cd2d5f9dd27d5b7242"
+    },
+    {
+     "anchor": "rust-reference/structs.md#A _struct_ is a nominal [struct type] defined with the keyword `struct`.",
+     "digest": "4263909bb55120968f45050a3de1c677c464a77baf8dd34865dfac3793291555"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-GEN-RUST",
+   "statement": "For each of the five model indexes, `spindlebox generate --lang rust` writes Rust that declares the seven model types; indexing the generated Rust gives back the source index's canonical forms; and where cargo is installed, `cargo check --offline` on the generated crate passes. Where cargo is absent the compile check is reported as skipped, never as passed (#27).",
+   "numeric": false,
+   "sources": [
+    {
+     "anchor": "rust-reference/enumerations.md#`enum` IDENTIFIER GenericParams?",
+     "digest": "001bcd511ca90341ac2e36bb5f53cb2ef8f3fabc9d120562c46d0e2b9d82d9bb"
+    },
+    {
+     "anchor": "inputs/rust/model.rs#pub struct Tree<T> {",
+     "digest": "47ec5a76531a9c3c8388f493c4b29ba72d059a3d6be12bf87b333497261abb6f"
+    }
+   ],
+   "outcome": "unverified"
+  },
+  {
+   "id": "DS-GEN-SIG",
+   "statement": "In the generated Java, `total` is declared as `<..Money> total(<..Order> <name>)`; in the generated Rust, as `fn total(<name>: [&]<..Order>) -> <..Money>`; neither uses an opaque stand-in (Object, serde_json::Value) for those types.",
+   "numeric": false,
+   "sources": [
+    {
+     "anchor": "inputs/java/Model.java#public static Money total(Order order) {",
+     "digest": "553fdbeb740307b52c189c8aff25ccbbed942e55571d82cd2d5f9dd27d5b7242"
+    },
+    {
+     "anchor": "inputs/rust/model.rs#pub fn total(order: Order) -> Money {",
+     "digest": "47ec5a76531a9c3c8388f493c4b29ba72d059a3d6be12bf87b333497261abb6f"
+    }
+   ],
+   "outcome": "unverified"
+  }
+ ]
+}

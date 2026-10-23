@@ -39,7 +39,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["tests/fixtures"]
+extend-exclude = ["tests/fixtures", "gx/*/corpus"]  # fixtures and pinned gx corpora are ground truth, not our code
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]

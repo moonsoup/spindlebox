@@ -1,0 +1,103 @@
+{
+  "files": [
+    {
+      "path": "python-3.11.4/dataclasses.rst",
+      "sha256": "b85e878643b0f16d90ba8bbb211d70c00194fe58a4f62bc9797e6346df7500c6",
+      "source": "CPython 3.11.4 documentation, Doc/library/dataclasses.rst",
+      "license": "PSF License Agreement (Python documentation)",
+      "url": "https://raw.githubusercontent.com/python/cpython/v3.11.4/Doc/library/dataclasses.rst",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "python-3.11.4/enum.rst",
+      "sha256": "4eee787e4fdc438d2261866148a6823d23b2a3b7af4f1b25f8bdbfe904c16d34",
+      "source": "CPython 3.11.4 documentation, Doc/library/enum.rst",
+      "license": "PSF License Agreement (Python documentation)",
+      "url": "https://raw.githubusercontent.com/python/cpython/v3.11.4/Doc/library/enum.rst",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "python-3.11.4/typing.rst",
+      "sha256": "cdd551576923e06714957ba4edaa381dbd44d192bc3c2b9d0a1728233f9b42fa",
+      "source": "CPython 3.11.4 documentation, Doc/library/typing.rst",
+      "license": "PSF License Agreement (Python documentation)",
+      "url": "https://raw.githubusercontent.com/python/cpython/v3.11.4/Doc/library/typing.rst",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "go-1.22.0/go_spec.html",
+      "sha256": "783fdf67dd27ff9f9a9309c337f902b4c01d5b5bb9014b1db2c190dd785fe438",
+      "source": "The Go Programming Language Specification, go1.22.0 tag",
+      "license": "BSD-3-Clause (Go source tree); spec text CC BY 4.0",
+      "url": "https://raw.githubusercontent.com/golang/go/go1.22.0/doc/go_spec.html",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "rust-reference/structs.md",
+      "sha256": "4263909bb55120968f45050a3de1c677c464a77baf8dd34865dfac3793291555",
+      "source": "The Rust Reference, src/items/structs.md (master at retrieval; pinned by sha256)",
+      "license": "MIT OR Apache-2.0",
+      "url": "https://raw.githubusercontent.com/rust-lang/reference/master/src/items/structs.md",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "rust-reference/enumerations.md",
+      "sha256": "001bcd511ca90341ac2e36bb5f53cb2ef8f3fabc9d120562c46d0e2b9d82d9bb",
+      "source": "The Rust Reference, src/items/enumerations.md (master at retrieval; pinned by sha256)",
+      "license": "MIT OR Apache-2.0",
+      "url": "https://raw.githubusercontent.com/rust-lang/reference/master/src/items/enumerations.md",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "typescript-handbook/Narrowing.md",
+      "sha256": "4836a29bbb3097085d0b21d0631ac464fcfb2a8719a17f4602e892d2be4f337e",
+      "source": "TypeScript Handbook v2, Narrowing (discriminated unions)",
+      "license": "CC BY 4.0 (TypeScript-Website documentation)",
+      "url": "https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/handbook-v2/Narrowing.md",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "typescript-handbook/Object Types.md",
+      "sha256": "2eea0f3453af5dc3f30c01f4a5a84911fb2b993bbeb674a53e834f4d2a8e679a",
+      "source": "TypeScript Handbook v2, Object Types (interfaces, generic object types)",
+      "license": "CC BY 4.0 (TypeScript-Website documentation)",
+      "url": "https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/handbook-v2/Object%20Types.md",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "inputs/python/model.py",
+      "sha256": "831f55e9abe9a116b824166d39f9fea0ff9a2d830c68a4aa6242d99a9e1bdc47",
+      "source": "synthetic fixture written for this round; imports and runs under Python 3.11.4",
+      "license": "synthetic (this repository)",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "inputs/go/model.go",
+      "sha256": "083da7df710fbbe17692a8196fc56e80d303385e9ee133a3471645d7cb4199a5",
+      "source": "synthetic fixture written for this round; passes go vet (go1.22+)",
+      "license": "synthetic (this repository)",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "inputs/rust/model.rs",
+      "sha256": "47ec5a76531a9c3c8388f493c4b29ba72d059a3d6be12bf87b333497261abb6f",
+      "source": "synthetic fixture written for this round; NOT compiled locally (cargo absent, #27)",
+      "license": "synthetic (this repository)",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "inputs/typescript/model.ts",
+      "sha256": "29764a8e0c9ba856a8bea1de4b36940ea15e7b0b6cc2ba914437114749d5bf65",
+      "source": "synthetic fixture written for this round; tsc 5.4.5 --strict --noEmit clean",
+      "license": "synthetic (this repository)",
+      "retrieved": "2026-10-23"
+    },
+    {
+      "path": "inputs/java/Model.java",
+      "sha256": "553fdbeb740307b52c189c8aff25ccbbed942e55571d82cd2d5f9dd27d5b7242",
+      "source": "synthetic fixture written for this round; javac (JDK 17+) clean",
+      "license": "synthetic (this repository)",
+      "retrieved": "2026-10-23"
+    }
+  ]
+}

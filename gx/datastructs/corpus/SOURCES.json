@@ -1,0 +1,17 @@
+{
+  "files": [
+    {"path": "python-3.11.4/dataclasses.rst", "url": "https://raw.githubusercontent.com/python/cpython/v3.11.4/Doc/library/dataclasses.rst", "source": "CPython 3.11.4 documentation, Doc/library/dataclasses.rst", "license": "PSF License Agreement (Python documentation)"},
+    {"path": "python-3.11.4/enum.rst", "url": "https://raw.githubusercontent.com/python/cpython/v3.11.4/Doc/library/enum.rst", "source": "CPython 3.11.4 documentation, Doc/library/enum.rst", "license": "PSF License Agreement (Python documentation)"},
+    {"path": "python-3.11.4/typing.rst", "url": "https://raw.githubusercontent.com/python/cpython/v3.11.4/Doc/library/typing.rst", "source": "CPython 3.11.4 documentation, Doc/library/typing.rst", "license": "PSF License Agreement (Python documentation)"},
+    {"path": "go-1.22.0/go_spec.html", "url": "https://raw.githubusercontent.com/golang/go/go1.22.0/doc/go_spec.html", "source": "The Go Programming Language Specification, go1.22.0 tag", "license": "BSD-3-Clause (Go source tree); spec text CC BY 4.0"},
+    {"path": "rust-reference/structs.md", "url": "https://raw.githubusercontent.com/rust-lang/reference/master/src/items/structs.md", "source": "The Rust Reference, src/items/structs.md (master at retrieval; pinned by sha256)", "license": "MIT OR Apache-2.0"},
+    {"path": "rust-reference/enumerations.md", "url": "https://raw.githubusercontent.com/rust-lang/reference/master/src/items/enumerations.md", "source": "The Rust Reference, src/items/enumerations.md (master at retrieval; pinned by sha256)", "license": "MIT OR Apache-2.0"},
+    {"path": "typescript-handbook/Narrowing.md", "url": "https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/handbook-v2/Narrowing.md", "source": "TypeScript Handbook v2, Narrowing (discriminated unions)", "license": "CC BY 4.0 (TypeScript-Website documentation)"},
+    {"path": "typescript-handbook/Object Types.md", "url": "https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/handbook-v2/Object%20Types.md", "source": "TypeScript Handbook v2, Object Types (interfaces, generic object types)", "license": "CC BY 4.0 (TypeScript-Website documentation)"},
+    {"path": "inputs/python/model.py", "source": "synthetic fixture written for this round; imports and runs under Python 3.11.4", "license": "synthetic (this repository)"},
+    {"path": "inputs/go/model.go", "source": "synthetic fixture written for this round; passes go vet (go1.22+)", "license": "synthetic (this repository)"},
+    {"path": "inputs/rust/model.rs", "source": "synthetic fixture written for this round; NOT compiled locally (cargo absent, #27)", "license": "synthetic (this repository)"},
+    {"path": "inputs/typescript/model.ts", "source": "synthetic fixture written for this round; tsc 5.4.5 --strict --noEmit clean", "license": "synthetic (this repository)"},
+    {"path": "inputs/java/Model.java", "source": "synthetic fixture written for this round; javac (JDK 17+) clean", "license": "synthetic (this repository)"}
+  ]
+}

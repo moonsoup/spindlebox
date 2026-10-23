@@ -1,0 +1,72 @@
+{
+  "algo": "sha256",
+  "entries": [
+    {
+      "file": "gx/datastructs/test_ds_index.py",
+      "digest": "b63772a874beea08e9cf99b2f598711ff90b093b4cd003aa5a3226f0a09dd08e"
+    },
+    {
+      "file": "gx/datastructs/test_ds_replicate.py",
+      "digest": "7c98774992525c866a8d0e7053dc55a6e208aa1ea12502277eee6131791b0cb0"
+    }
+  ],
+  "digest": "a6b013fd7a845324c4f6210ef070eecbb387ff862380b0057084c197c0579e01",
+  "support": [
+    {
+      "file": "gx/datastructs/conftest.py",
+      "digest": "7feecbb22b548d7a9bcbf1d57db3ed5b6bfb979a1dc8fdf449b4f647873e0afc"
+    },
+    {
+      "file": "gx/datastructs/corpus/go-1.22.0/go_spec.html",
+      "digest": "783fdf67dd27ff9f9a9309c337f902b4c01d5b5bb9014b1db2c190dd785fe438"
+    },
+    {
+      "file": "gx/datastructs/corpus/inputs/go/model.go",
+      "digest": "083da7df710fbbe17692a8196fc56e80d303385e9ee133a3471645d7cb4199a5"
+    },
+    {
+      "file": "gx/datastructs/corpus/inputs/java/Model.java",
+      "digest": "553fdbeb740307b52c189c8aff25ccbbed942e55571d82cd2d5f9dd27d5b7242"
+    },
+    {
+      "file": "gx/datastructs/corpus/inputs/python/model.py",
+      "digest": "831f55e9abe9a116b824166d39f9fea0ff9a2d830c68a4aa6242d99a9e1bdc47"
+    },
+    {
+      "file": "gx/datastructs/corpus/inputs/rust/model.rs",
+      "digest": "47ec5a76531a9c3c8388f493c4b29ba72d059a3d6be12bf87b333497261abb6f"
+    },
+    {
+      "file": "gx/datastructs/corpus/inputs/typescript/model.ts",
+      "digest": "29764a8e0c9ba856a8bea1de4b36940ea15e7b0b6cc2ba914437114749d5bf65"
+    },
+    {
+      "file": "gx/datastructs/corpus/python-3.11.4/dataclasses.rst",
+      "digest": "b85e878643b0f16d90ba8bbb211d70c00194fe58a4f62bc9797e6346df7500c6"
+    },
+    {
+      "file": "gx/datastructs/corpus/python-3.11.4/enum.rst",
+      "digest": "4eee787e4fdc438d2261866148a6823d23b2a3b7af4f1b25f8bdbfe904c16d34"
+    },
+    {
+      "file": "gx/datastructs/corpus/python-3.11.4/typing.rst",
+      "digest": "cdd551576923e06714957ba4edaa381dbd44d192bc3c2b9d0a1728233f9b42fa"
+    },
+    {
+      "file": "gx/datastructs/corpus/rust-reference/enumerations.md",
+      "digest": "001bcd511ca90341ac2e36bb5f53cb2ef8f3fabc9d120562c46d0e2b9d82d9bb"
+    },
+    {
+      "file": "gx/datastructs/corpus/rust-reference/structs.md",
+      "digest": "4263909bb55120968f45050a3de1c677c464a77baf8dd34865dfac3793291555"
+    },
+    {
+      "file": "gx/datastructs/corpus/typescript-handbook/Narrowing.md",
+      "digest": "4836a29bbb3097085d0b21d0631ac464fcfb2a8719a17f4602e892d2be4f337e"
+    },
+    {
+      "file": "gx/datastructs/corpus/typescript-handbook/Object Types.md",
+      "digest": "2eea0f3453af5dc3f30c01f4a5a84911fb2b993bbeb674a53e834f4d2a8e679a"
+    }
+  ]
+}
